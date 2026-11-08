@@ -111,10 +111,10 @@ function parsePadding(style) {
   return { t, r, b, l };
 }
 
-// Estima cuántos renglones ocupa un texto con Patrick Hand (≈0.48 em por carácter,
+// Estima cuántos renglones ocupa un texto con Patrick Hand (≈0.44 em por carácter medido con la fuente real,
 // un poco de más para no quedarse corto).
 function lines(text, widthPx, fontPx) {
-  const perLine = Math.max(8, Math.floor(widthPx / (fontPx * 0.48)));
+  const perLine = Math.max(8, Math.floor(widthPx / (fontPx * 0.44)));
   return String(text || '')
     .split('\n')
     .reduce((n, para) => n + Math.max(1, Math.ceil(para.length / perLine)), 0);
