@@ -54,6 +54,7 @@ El código del backend está completo según la especificación y probado sin re
 | `npm run db:init` | Crea las tablas |
 | `npm test` | Pruebas |
 | `npm run preview` | Genera `previews/<diseño>-corta.html` y `-larga.html` con cartas de ejemplo. Ábrelos en Chrome → Imprimir → Guardar como PDF (carta, sin márgenes) para ver cómo saldrá impreso |
+| `node scripts/send-test-letter.js --design taller --to "Nombre\|Línea 1\|\|Ciudad\|PR\|00612"` | Manda una carta de prueba a Lob sin pasar por el sitio ni por Stripe. Con la clave `test_` solo genera el PDF; con `live_` la imprime y envía (pide confirmación). Opciones: `--design todos`, `--larga`, `--dry` |
 | `node scripts/build-papeles.js` | Regenera `papeles/papeles.json` desde `docs/prototipo/LetterArt.dc.html` si cambias un diseño |
 
 Con el servidor corriendo, `GET /api/admin/sample/<diseño>` (con `x-admin-token`) muestra una carta de ejemplo sin crear órdenes.
