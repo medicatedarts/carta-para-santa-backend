@@ -12,17 +12,20 @@ Documento de referencia para construir el backend. Se parte del código de `te-l
 
 ```
 server.js              rutas Express (checkout, webhooks, pedido, config, admin)
-db.js                  pool de Postgres (pg) + consultas
+db.js                  pool de Postgres (pg) + consultas, incluido el chequeo atómico claimForLob
 sql/schema.sql         tablas
 validate.js            límites y normalización de la carta
 contentFilter.js       filtro adaptado a niños (ver §6)
 santaReply.js          arma el texto de la respuesta de Santa (ver docs/RESPUESTA_DE_SANTA.md)
-printTemplate.js       HTML de 2 páginas para Lob
-papeles/               CSS + SVG de los 5 diseños de papel (fuente de verdad, ver §7)
-fonts/                 woff2 de Fraunces, Nunito, Patrick Hand, Pinyon Script (servidos públicamente para Lob)
-lob.js                 crear carta, verificar webhooks
-email.js               envío de correos (Resend u otro)
+printTemplate.js       HTML de 2 páginas para Lob, con ajuste automático de letra para cartas largas
+papeles/papeles.json   los 5 diseños, generados del prototipo con scripts/build-papeles.js
+fonts/                 woff2 opcionales para que Lob no dependa de Google Fonts (ver fonts/README.md)
+lob.js                 crear carta, clasificar errores, verificar webhooks
+fulfill.js             después del pago: revisión o envío a Lob
+email.js               correos al adulto y alertas (Resend por fetch)
 jobs.js                reintentos, alertas y borrado por retención (setInterval)
+scripts/               db-init, preview (cartas de ejemplo en previews/), build-papeles
+test/                  pruebas con node --test (sin base de datos ni red)
 ```
 
 Dependencias nuevas sobre Yo Te Lo Dije: `pg`. Opcional: `resend` (o `fetch` directo a su API).

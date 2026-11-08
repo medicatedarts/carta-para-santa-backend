@@ -42,6 +42,22 @@ genera el HTML de 2 páginas (respuesta de Santa + copia de la carta) → Lob (I
 | Panel | Solo `DELETE /api/order/:id` | Endpoints de administración (ver la especificación) |
 | Consentimiento | Mayor de 18 / autorizado | Padre, madre o tutor (COPPA) |
 
+## Estado
+
+El código del backend está completo según la especificación y probado sin red ni base de datos (`npm test`: validación, filtro, respuesta de Santa, envío a Lob sin duplicados y verificación de webhooks). Las consultas SQL se probaron contra Postgres 16. Falta probarlo de punta a punta con las claves de prueba de Stripe y Lob.
+
+## Scripts
+
+| Comando | Qué hace |
+| --- | --- |
+| `npm run dev` | Servidor con recarga automática |
+| `npm run db:init` | Crea las tablas |
+| `npm test` | Pruebas |
+| `npm run preview` | Genera `previews/<diseño>-corta.html` y `-larga.html` con cartas de ejemplo. Ábrelos en Chrome → Imprimir → Guardar como PDF (carta, sin márgenes) para ver cómo saldrá impreso |
+| `node scripts/build-papeles.js` | Regenera `papeles/papeles.json` desde `docs/prototipo/LetterArt.dc.html` si cambias un diseño |
+
+Con el servidor corriendo, `GET /api/admin/sample/<diseño>` (con `x-admin-token`) muestra una carta de ejemplo sin crear órdenes.
+
 ## Correr en desarrollo
 
 ```bash

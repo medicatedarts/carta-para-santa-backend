@@ -1,0 +1,24 @@
+{
+  "name": "carta-para-santa-backend",
+  "version": "1.0.0",
+  "description": "Backend de CartaParaSanta.com: recibe la carta, cobra con Stripe y manda a Lob a imprimir y enviar la respuesta de Santa.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "db:init": "node scripts/db-init.js",
+    "preview": "node scripts/preview.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "stripe": "^16.8.0"
+  }
+}
