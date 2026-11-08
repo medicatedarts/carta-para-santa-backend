@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Respuesta de Santa — carta impresa</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&amp;family=Nunito:wght@400;600;700;800&amp;family=Patrick+Hand&amp;family=Pinyon+Script&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 816px; height: 1056px; box-sizing: border-box; position: relative; overflow: hidden; background: #FFFDF7; font-family: 'Fraunces', Georgia, serif; color: #2A241C">
+
+<!-- frame -->
+<div style="position: absolute; inset: 22px; border: 6px solid transparent; border-image: repeating-linear-gradient(45deg, #B3261E 0 12px, #FFFDF7 12px 18px, #1F6B47 18px 30px, #FFFDF7 30px 36px) 6; pointer-events: none"></div>
+<div style="position: absolute; inset: 36px; border: 1.5px solid #C9A24A; pointer-events: none"></div>
+
+<!-- Lob address zone -->
+<sc-if value="{{showZone}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; left: 58px; top: 48px; width: 346px; height: 202px; border: 2px dashed #8E9A93; border-radius: 4px; background: #FFFDF7; display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; box-sizing: border-box; font-family: 'Nunito', sans-serif; font-size: 13px; font-weight: 700; color: #5A645F">Área reservada: Lob imprime aquí el remitente y la dirección (visible por la ventana del sobre). Medidas por confirmar con su plantilla.</div>
+</sc-if>
+
+<!-- crest -->
+<div style="position: absolute; right: 64px; top: 62px; width: 300px; display: flex; flex-direction: column; align-items: center; text-align: center">
+<svg width="86" height="86" viewBox="0 0 86 86" aria-hidden="true">
+<circle cx="43" cy="43" r="40" fill="#B3261E"/>
+<circle cx="43" cy="43" r="33" fill="none" stroke="#E2C27A" stroke-width="1.5" stroke-dasharray="2 4"/>
+<path d="M43 18l5.6 15.4L64 39l-15.4 5.6L43 60l-5.6-15.4L22 39l15.4-5.6z" fill="#F3D58A"/>
+<path d="M28 64 h30" stroke="#F3D58A" stroke-width="2" stroke-linecap="round"/>
+</svg>
+<p style="margin: 10px 0 0; font-weight: 700; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; color: #1F6B47">Taller de Santa Claus</p>
+<p style="margin: 2px 0 0; font-weight: 700; font-size: 30px; line-height: 1.05; color: #0F3324">Polo Norte</p>
+<p style="margin: 6px 0 0; font-family: 'Patrick Hand', cursive; font-size: 17px; color: #6B5016">Diciembre, [AÑO]</p>
+</div>
+
+<!-- body -->
+<div style="position: absolute; left: 96px; right: 96px; top: 290px; display: flex; flex-direction: column; gap: 13px; font-size: 16.5px; line-height: 1.55">
+<p style="margin: 0; font-family: 'Patrick Hand', cursive; font-size: 30px; color: #B3261E">Querida <span style="background: {{hl}}">Sofía</span>:</p>
+<p style="margin: 0">¡Tu carta llegó al Polo Norte! La leí junto a la chimenea del taller, con una taza de chocolate caliente, y me hizo sonreír de oreja a oreja.</p>
+<p style="margin: 0">Los duendes me contaron que este año <span style="background: {{hl}}">te portaste muy bien y ayudaste mucho en casa</span>. ¡Eso me pone muy, muy feliz!</p>
+<p style="margin: 0">Anoté con cuidado tu lista: <span style="background: {{hl}}">una bicicleta roja, un set de pintura y un libro de dinosaurios</span>. Ya se la entregué a los duendes del taller para que la revisen con mucho cariño.</p>
+<p style="margin: 0">Mientras tanto, sigue siendo amable, comparte con los demás y acuéstate temprano en Nochebuena. Rodolfo y los demás renos te mandan un saludo enorme.</p>
+<p style="margin: 6px 0 0">Con mucho cariño desde el Polo Norte,</p>
+<p style="margin: -4px 0 0; font-family: 'Pinyon Script', cursive; font-size: 58px; line-height: 1.1; color: #B3261E">Santa Claus</p>
+<p style="margin: 0; padding-top: 12px; border-top: 1px solid #E8D9B0; font-family: 'Patrick Hand', cursive; font-size: 18px; color: #4B3D22">P.D. En este sobre va una copia de la carta que me escribiste. ¡Guárdala como un recuerdo mágico!</p>
+</div>
+
+<!-- bottom ornament -->
+<svg style="position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%)" width="220" height="24" viewBox="0 0 220 24" aria-hidden="true">
+<path d="M0 12h86M134 12h86" stroke="#C9A24A" stroke-width="1.5"/>
+<path d="M110 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#C9A24A"/>
+<circle cx="94" cy="12" r="2.5" fill="#B3261E"/><circle cx="126" cy="12" r="2.5" fill="#1F6B47"/>
+</svg>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"showLobZone":{"editor":"boolean","default":true},"highlightFields":{"editor":"boolean","default":true},"$preview":{"width":816,"height":1056}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var hl = (this.props.highlightFields ?? true) ? '#F6EBC8' : 'transparent';
+    return { showZone: this.props.showLobZone ?? true, hl: hl };
+  }
+}
+</script>
+</body>
+</html>

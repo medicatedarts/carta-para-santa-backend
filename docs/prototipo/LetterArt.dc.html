@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Papel de carta</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&amp;family=Nunito:wght@400;600;700;800&amp;family=Patrick+Hand&amp;family=Pinyon+Script&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="{{rootStyle}}">
+
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+<defs>
+<filter id="la-wc" x="-10%" y="-10%" width="120%" height="120%">
+<feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4"/>
+<feDisplacementMap in="SourceGraphic" scale="5"/>
+</filter>
+</defs>
+</svg>
+
+<!-- ============ 1. CORREO AÉREO CLÁSICO ============ -->
+<sc-if value="{{isClasica}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; top: 34px; right: 34px; width: 170px; height: 120px; z-index: 2; pointer-events: none">
+<svg style="position: absolute; right: 0; top: 0" width="120" height="70" viewBox="0 0 120 70" aria-hidden="true">
+<path d="M10 14 q12 -8 24 0 t24 0 t24 0 t24 0 M10 28 q12 -8 24 0 t24 0 t24 0 t24 0 M10 42 q12 -8 24 0 t24 0 t24 0 t24 0 M10 56 q12 -8 24 0 t24 0 t24 0 t24 0" fill="none" stroke="#C8302B" stroke-width="2" opacity="0.75"/>
+</svg>
+<div style="position: absolute; left: 6px; top: 4px; width: 70px; height: 84px; padding: 5px; box-sizing: border-box; background: radial-gradient(circle, transparent 2.6px, #FFFFFF 3px) -4px -4px / 9px 9px; transform: rotate(-7deg); filter: drop-shadow(0 2px 2px rgba(0,0,0,0.15))">
+<div style="width: 100%; height: 100%; background: #F3EEDF; border: 3px solid #2F8A4A; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+<svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3l4.5 11.5L36 19l-11.5 4.5L20 35l-4.5-11.5L4 19l11.5-4.5z" fill="#E8B23A"/><circle cx="20" cy="19" r="3" fill="#C8302B"/></svg>
+</div>
+</div>
+<div style="position: absolute; left: 62px; top: 40px; width: 74px; height: 86px; padding: 5px; box-sizing: border-box; background: radial-gradient(circle, transparent 2.6px, #FFFFFF 3px) -4px -4px / 9px 9px; transform: rotate(8deg); filter: drop-shadow(0 2px 2px rgba(0,0,0,0.15))">
+<div style="width: 100%; height: 100%; background: #F3EEDF; border: 3px solid #C8302B; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+<svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><rect x="7" y="17" width="30" height="22" fill="#2F8A4A"/><rect x="5" y="12" width="34" height="7" fill="#3FA25C"/><rect x="20" y="12" width="4" height="27" fill="#C8302B"/><path d="M22 12 c-4 -8 -12 -6 -9 -1 M22 12 c4 -8 12 -6 9 -1" fill="none" stroke="#C8302B" stroke-width="2.5"/></svg>
+</div>
+</div>
+</div>
+<p style="position: absolute; left: 0; right: 0; bottom: 42px; margin: 0; text-align: center; font-family: 'Pinyon Script', cursive; font-size: 34px; color: #C8302B; z-index: 2">¡Feliz Navidad!</p>
+</sc-if>
+
+<!-- ============ 2. TALLER DE LOS DUENDES ============ -->
+<sc-if value="{{isTaller}}" hint-placeholder-val="{{ false }}">
+<svg style="position: absolute; left: 0; top: 0; width: 100%; display: block; z-index: 2" viewBox="0 0 560 120" aria-hidden="true">
+<path d="M-10 18 q70 50 145 14 q75 -36 145 6 q70 40 140 4 q70 -34 150 10" fill="none" stroke="#1F4D2B" stroke-width="22" stroke-linecap="round"/>
+<path d="M-10 18 q70 50 145 14 q75 -36 145 6 q70 40 140 4 q70 -34 150 10" fill="none" stroke="#3E7C46" stroke-width="12" stroke-dasharray="3 5" stroke-linecap="round"/>
+<path d="M-10 26 q70 52 145 16 q75 -34 145 8 q70 42 140 6 q70 -32 150 12" fill="none" stroke="#2A2A2A" stroke-width="1.2"/>
+<g><circle cx="40" cy="46" r="5" fill="#F2C14E"/><circle cx="90" cy="54" r="5" fill="#E5484D"/><circle cx="140" cy="44" r="5" fill="#5BB5D9"/><circle cx="190" cy="28" r="5" fill="#F2C14E"/><circle cx="240" cy="30" r="5" fill="#7CC66B"/><circle cx="290" cy="46" r="5" fill="#E5484D"/><circle cx="340" cy="54" r="5" fill="#5BB5D9"/><circle cx="390" cy="42" r="5" fill="#F2C14E"/><circle cx="440" cy="26" r="5" fill="#E5484D"/><circle cx="490" cy="30" r="5" fill="#7CC66B"/><circle cx="535" cy="42" r="5" fill="#F2C14E"/></g>
+<g fill="#C8302B"><circle cx="70" cy="32" r="4"/><circle cx="76" cy="36" r="4"/><circle cx="214" cy="20" r="4"/><circle cx="220" cy="25" r="4"/><circle cx="364" cy="30" r="4"/><circle cx="370" cy="34" r="4"/><circle cx="508" cy="18" r="4"/><circle cx="514" cy="23" r="4"/></g>
+<path d="M30 30 v40 M60 36 v62" stroke="#8A6A1F" stroke-width="1"/>
+<path d="M30 66 l4 9 9 4 -9 4 -4 9 -4 -9 -9 -4 9 -4z" fill="#E8C25A" stroke="#B08A2A" stroke-width="1"/>
+<path d="M60 94 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z" fill="#E8C25A" stroke="#B08A2A" stroke-width="1"/>
+</svg>
+<svg style="position: absolute; left: 8px; bottom: 6px; width: 30%; max-width: 150px; z-index: 2" viewBox="0 0 150 130" aria-hidden="true">
+<rect x="14" y="48" width="122" height="78" rx="4" fill="#F2E3C6"/>
+<g fill="#C8302B" opacity="0.85"><circle cx="34" cy="70" r="4"/><circle cx="60" cy="96" r="4"/><circle cx="96" cy="72" r="4"/><circle cx="118" cy="104" r="4"/><circle cx="40" cy="112" r="4"/></g>
+<rect x="8" y="38" width="134" height="18" rx="3" fill="#EAD7B2"/>
+<rect x="66" y="38" width="18" height="88" fill="#C8302B"/>
+<path d="M75 38 c-30 -34 -52 -10 -26 2 M75 38 c30 -34 52 -10 26 2" fill="none" stroke="#C8302B" stroke-width="9" stroke-linecap="round"/>
+</svg>
+<svg style="position: absolute; right: 10px; bottom: 10px; width: 22%; max-width: 110px; z-index: 2" viewBox="0 0 110 90" aria-hidden="true">
+<rect x="8" y="6" width="94" height="14" rx="3" fill="#B98A57"/><rect x="8" y="70" width="94" height="14" rx="3" fill="#B98A57"/>
+<rect x="16" y="18" width="78" height="54" fill="#FFFFFF"/>
+<g stroke="#C8302B" stroke-width="5"><path d="M16 26 l18 46 M34 18 l22 54 M54 18 l22 54 M74 18 l20 50"/></g>
+</svg>
+<div style="position: absolute; left: 50%; bottom: 18px; transform: translateX(-30%) rotate(-8deg); background: #E9D3A6; border: 1.5px solid #B9965C; border-radius: 6px 22px 22px 6px; padding: 6px 26px 6px 14px; font-family: 'Patrick Hand', cursive; font-size: 15px; color: #5A3C1A; z-index: 2; white-space: nowrap">hecho con cariño de duende</div>
+</sc-if>
+
+<!-- ============ 3. NOCHE DE ESTRELLAS ============ -->
+<sc-if value="{{isEstrellas}}" hint-placeholder-val="{{ false }}">
+<svg style="position: absolute; left: 4%; top: 6px; z-index: 2" width="58" height="66" viewBox="0 0 58 66" aria-hidden="true"><ellipse cx="29" cy="40" rx="20" ry="24" fill="#1A1A2E"/><ellipse cx="29" cy="45" rx="13" ry="17" fill="#FFFFFF"/><circle cx="23" cy="30" r="2.5" fill="#1A1A2E"/><circle cx="35" cy="30" r="2.5" fill="#1A1A2E"/><path d="M25 35 l4 5 4 -5z" fill="#F29A2E"/><path d="M17 64 h9 M32 64 h9" stroke="#F29A2E" stroke-width="4" stroke-linecap="round"/><path d="M12 22 q17 -26 34 0z" fill="#D9312B"/><rect x="11" y="19" width="36" height="6" rx="3" fill="#FFFFFF"/><circle cx="46" cy="10" r="4" fill="#FFFFFF"/></svg>
+<svg style="position: absolute; left: 32%; top: 12px; z-index: 2" width="40" height="46" viewBox="0 0 40 46" aria-hidden="true"><rect x="15" y="0" width="10" height="7" fill="#E8C25A"/><circle cx="20" cy="26" r="18" fill="#D9312B"/><path d="M4 22 h32 M4 30 h32" stroke="#FFFFFF" stroke-width="3"/></svg>
+<svg style="position: absolute; left: 54%; top: 4px; z-index: 2" width="52" height="58" viewBox="0 0 52 58" aria-hidden="true"><path d="M26 2 a9 9 0 0 1 9 9 a9 9 0 0 1 -2 6 h12 a5 5 0 0 1 0 10 h-8 l6 22 a5 5 0 0 1 -9 4 l-8 -14 l-8 14 a5 5 0 0 1 -9 -4 l6 -22 h-8 a5 5 0 0 1 0 -10 h12 a9 9 0 0 1 -2 -6 a9 9 0 0 1 9 -9z" fill="#C9803E"/><path d="M8 22 h6 M38 22 h6" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/><circle cx="23" cy="10" r="1.6" fill="#3A2614"/><circle cx="29" cy="10" r="1.6" fill="#3A2614"/><circle cx="26" cy="26" r="2.4" fill="#D9312B"/><circle cx="26" cy="33" r="2.4" fill="#2C8FA3"/></svg>
+<svg style="position: absolute; right: 4%; top: 8px; z-index: 2" width="66" height="56" viewBox="0 0 66 56" aria-hidden="true"><path d="M6 4 q14 -4 18 8" fill="none" stroke="#5FB8C9" stroke-width="2"/><rect x="2" y="12" width="26" height="30" rx="12" fill="#3FA0B4"/><rect x="2" y="40" width="26" height="10" rx="4" fill="#FFFFFF"/><rect x="36" y="16" width="26" height="30" rx="12" fill="#3FA0B4" transform="rotate(12 49 31)"/><rect x="34" y="42" width="26" height="10" rx="4" fill="#FFFFFF" transform="rotate(12 47 47)"/><path d="M12 24 l3 3 3 -3" fill="none" stroke="#D9312B" stroke-width="2"/></svg>
+<svg style="position: absolute; right: 6px; top: 30%; z-index: 2" width="30" height="64" viewBox="0 0 30 64" aria-hidden="true"><path d="M8 62 V18 a9 9 0 0 1 18 0" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/><path d="M8 62 V18 a9 9 0 0 1 18 0" fill="none" stroke="#D9312B" stroke-width="7" stroke-dasharray="5 6" stroke-linecap="butt"/></svg>
+<svg style="position: absolute; right: 2px; top: 52%; z-index: 2" width="56" height="66" viewBox="0 0 56 66" aria-hidden="true"><path d="M14 12 h26 v28 l10 10 a8 8 0 0 1 -11 11 l-20 -16 q-5 -5 -5 -12z" fill="#D9312B"/><rect x="10" y="4" width="34" height="13" rx="5" fill="#FFFFFF"/><path d="M27 30 v14 M20 37 h14 M22 32 l10 10 M32 32 l-10 10" stroke="#FFFFFF" stroke-width="1.6"/></svg>
+<svg style="position: absolute; left: 4px; top: 36%; z-index: 2" width="50" height="54" viewBox="0 0 50 54" aria-hidden="true"><rect x="8" y="2" width="8" height="8" rx="2" fill="#FFFFFF"/><rect x="18" y="0" width="8" height="8" rx="2" fill="#FFFFFF" transform="rotate(20 22 4)"/><path d="M6 14 h30 l-3 36 h-24z" fill="#3FA0B4"/><path d="M36 20 a8 8 0 0 1 0 16" fill="none" stroke="#3FA0B4" stroke-width="4"/><g fill="#FFFFFF"><circle cx="14" cy="24" r="2"/><circle cx="24" cy="30" r="2"/><circle cx="16" cy="40" r="2"/><circle cx="28" cy="42" r="2"/></g></svg>
+<svg style="position: absolute; left: 2px; top: 62%; z-index: 2" width="54" height="60" viewBox="0 0 54 60" aria-hidden="true"><path d="M27 2 l14 16 h-6 l12 14 h-6 l12 16 h-52 l12 -16 h-6 l12 -14 h-6z" fill="#D69A4E" stroke="#B87A34" stroke-width="1.5"/><path d="M14 34 q6 4 12 0 q6 -4 12 0 M10 48 q8 4 16 0 q8 -4 16 0" fill="none" stroke="#FFFFFF" stroke-width="2"/><circle cx="27" cy="22" r="2.5" fill="#D9312B"/></svg>
+<svg style="position: absolute; left: 12%; bottom: 4px; z-index: 2" width="58" height="70" viewBox="0 0 58 70" aria-hidden="true"><circle cx="29" cy="50" r="18" fill="#FFFFFF"/><circle cx="29" cy="24" r="13" fill="#FFFFFF"/><rect x="16" y="2" width="26" height="12" rx="3" fill="#3FA0B4"/><rect x="12" y="12" width="34" height="5" rx="2" fill="#D9312B"/><circle cx="25" cy="22" r="1.8" fill="#1A1A2E"/><circle cx="33" cy="22" r="1.8" fill="#1A1A2E"/><path d="M29 26 l8 2 -8 2z" fill="#F29A2E"/><path d="M17 36 q12 6 24 0 v6 q-12 6 -24 0z" fill="#3FA0B4"/><circle cx="29" cy="50" r="2" fill="#1A1A2E"/><circle cx="29" cy="58" r="2" fill="#1A1A2E"/></svg>
+<svg style="position: absolute; left: 50%; bottom: 6px; z-index: 2" width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><g transform="rotate(-14 28 30)"><rect x="8" y="18" width="40" height="34" fill="#FFFFFF"/><g stroke="#5FB8C9" stroke-width="4"><path d="M12 18 v34 M22 18 v34 M34 18 v34 M44 18 v34"/></g><path d="M8 33 h40 M28 18 v34" stroke="#D9312B" stroke-width="5"/><path d="M28 18 c-10 -12 -20 -4 -8 0 M28 18 c10 -12 20 -4 8 0" fill="none" stroke="#D9312B" stroke-width="4"/></g></svg>
+<svg style="position: absolute; right: 6px; bottom: 6px; z-index: 2" width="58" height="62" viewBox="0 0 58 62" aria-hidden="true"><ellipse cx="29" cy="38" rx="19" ry="22" fill="#1A1A2E"/><ellipse cx="29" cy="43" rx="12" ry="15" fill="#FFFFFF"/><path d="M22 28 q3 -3 6 0 M30 28 q3 -3 6 0" fill="none" stroke="#1A1A2E" stroke-width="2" stroke-linecap="round"/><path d="M25 32 l4 4 4 -4z" fill="#F29A2E"/><path d="M10 26 a19 19 0 0 1 38 0" fill="none" stroke="#D9312B" stroke-width="3"/><circle cx="10" cy="28" r="5" fill="#D9312B"/><circle cx="48" cy="28" r="5" fill="#D9312B"/><path d="M14 36 h30 v6 h-30z" fill="#3FA0B4"/></svg>
+</sc-if>
+
+<!-- ============ 4. CIELO DEL POLO NORTE ============ -->
+<sc-if value="{{isPolo}}" hint-placeholder-val="{{ false }}">
+<svg style="position: absolute; left: 0; top: 0; width: 100%; display: block; z-index: 2" viewBox="0 0 560 130" aria-hidden="true">
+<g stroke="#4F7F5A" stroke-width="1.2"><path d="M60 0 v40"/><path d="M135 0 v26"/><path d="M175 0 v58"/><path d="M265 0 v44"/><path d="M345 0 v30"/><path d="M400 0 v54"/><path d="M490 0 v34"/></g>
+<g><path d="M60 40 l-24 22 24 40 24 -40z" fill="#E7633C"/><path d="M40 62 l8 -6 8 6 8 -6 8 6 8 -6" fill="none" stroke="#7BC07E" stroke-width="3"/><rect x="54" y="36" width="12" height="7" fill="#7BC07E"/></g>
+<g><circle cx="135" cy="46" r="20" fill="#FFFFFF"/><path d="M118 42 l6 -5 6 5 6 -5 6 5 6 -5 6 5" fill="none" stroke="#E7633C" stroke-width="3"/><rect x="129" y="23" width="12" height="6" fill="#7BC07E"/></g>
+<g><circle cx="175" cy="80" r="22" fill="#7BC07E"/><path d="M155 76 h40 M155 86 h40" stroke="#FFFFFF" stroke-width="2.5" opacity="0.8"/><rect x="169" y="55" width="12" height="6" fill="#E7633C"/></g>
+<g><path d="M265 44 l-22 20 22 36 22 -36z" fill="#FFFFFF"/><path d="M247 64 h36 M252 72 h26" stroke="#E7633C" stroke-width="3"/><path d="M254 44 q11 -10 22 0" fill="#7BC07E"/><circle cx="265" cy="40" r="4" fill="#E7633C"/></g>
+<g><circle cx="345" cy="52" r="20" fill="#7BC07E"/><path d="M328 48 l6 -5 6 5 6 -5 6 5 6 -5 6 5" fill="none" stroke="#E7633C" stroke-width="3"/><path d="M338 30 q7 -6 14 0" fill="none" stroke="#E7633C" stroke-width="3"/></g>
+<g><path d="M400 54 l-24 22 24 40 24 -40z" fill="#7BC07E"/><path d="M380 76 h40" stroke="#E7633C" stroke-width="4"/><rect x="394" y="50" width="12" height="7" fill="#E7633C"/></g>
+<g><circle cx="490" cy="54" r="20" fill="#E7633C"/><path d="M472 50 l6 -5 6 5 6 -5 6 5 6 -5 6 5" fill="none" stroke="#FFFFFF" stroke-width="3"/><rect x="484" y="32" width="12" height="6" fill="#7BC07E"/></g>
+</svg>
+<svg style="position: absolute; left: 4%; top: 30%; z-index: 2" width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#4FB3D3" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M20.7 7L3.3 17M12 2l-2.5 2.5M12 2l2.5 2.5M12 22l-2.5-2.5M12 22l2.5-2.5M3.3 7l3.4.9M3.3 7l.9 3.4M20.7 17l-3.4-.9M20.7 17l-.9-3.4M20.7 7l-3.4.9M20.7 7l-.9 3.4M3.3 17l3.4-.9M3.3 17l.9-3.4"/></svg>
+<svg style="position: absolute; right: 3%; top: 58%; z-index: 2" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4FB3D3" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M20.7 7L3.3 17M12 2l-2.5 2.5M12 2l2.5 2.5M12 22l-2.5-2.5M12 22l2.5-2.5"/></svg>
+<svg style="position: absolute; left: 2%; top: 66%; z-index: 2" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#4FB3D3" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M20.7 7L3.3 17"/></svg>
+<svg style="position: absolute; left: 0; right: 0; bottom: 0; width: 100%; display: block; z-index: 1" viewBox="0 0 560 90" preserveAspectRatio="none" height="90" aria-hidden="true"><path d="M0 34 q80 -26 170 -4 q90 22 190 -6 q100 -26 200 6 v60 h-560z" fill="#FFFFFF"/></svg>
+<svg style="position: absolute; right: 18px; bottom: 14px; width: 26%; max-width: 130px; z-index: 2" viewBox="0 0 130 150" aria-hidden="true">
+<ellipse cx="62" cy="142" rx="34" ry="6" fill="#DCEFF6"/>
+<rect x="56" y="30" width="12" height="114" fill="#FFFFFF" stroke="#E7633C" stroke-width="1"/>
+<g fill="#E7633C"><path d="M56 40 l12 -8 v10 l-12 8z"/><path d="M56 62 l12 -8 v10 l-12 8z"/><path d="M56 84 l12 -8 v10 l-12 8z"/><path d="M56 106 l12 -8 v10 l-12 8z"/><path d="M56 128 l12 -8 v10 l-12 8z"/></g>
+<circle cx="62" cy="22" r="10" fill="#F2D35B"/>
+<rect x="4" y="44" width="122" height="36" rx="4" fill="#F0A97D" stroke="#C97A4E" stroke-width="1.5"/>
+<path d="M4 48 q30 -10 60 -2 q30 6 62 -4 v6 h-122z" fill="#FFFFFF"/>
+<text x="65" y="72" text-anchor="middle" font-family="Nunito, sans-serif" font-size="15" font-weight="800" fill="#2E4756">POLO NORTE</text>
+</svg>
+<p style="position: absolute; left: 0; right: 0; bottom: 18px; margin: 0; text-align: center; font-family: 'Patrick Hand', cursive; font-size: 17px; color: #3A6B80; z-index: 2">Taller de Santa · Polo Norte</p>
+</sc-if>
+
+<!-- ============ 5. JUGUETES EN ACUARELA ============ -->
+<sc-if value="{{isJuguetes}}" hint-placeholder-val="{{ false }}">
+<svg style="position: absolute; left: -6px; top: -4px; z-index: 2; filter: url(#la-wc); opacity: 0.88" width="96" height="110" viewBox="0 0 96 110" aria-hidden="true"><rect x="12" y="34" width="70" height="66" rx="4" fill="#8DCB8A"/><rect x="6" y="24" width="82" height="16" rx="3" fill="#A9DBA4"/><rect x="40" y="24" width="14" height="76" fill="#E98A8A"/><path d="M47 24 c-18 -24 -36 -6 -16 0 M47 24 c18 -24 36 -6 16 0" fill="none" stroke="#E98A8A" stroke-width="8" stroke-linecap="round"/></svg>
+<svg style="position: absolute; left: 38%; top: -10px; z-index: 2; filter: url(#la-wc); opacity: 0.88" width="88" height="96" viewBox="0 0 88 96" aria-hidden="true"><path d="M44 2 v14" stroke="#E98A8A" stroke-width="3"/><circle cx="44" cy="4" r="4" fill="#F3B562"/><rect x="14" y="16" width="60" height="44" rx="10" fill="#7FC8D8"/><circle cx="32" cy="38" r="9" fill="#FFFFFF"/><circle cx="56" cy="38" r="9" fill="#FFFFFF"/><circle cx="32" cy="38" r="5" fill="#E98A8A"/><circle cx="56" cy="38" r="5" fill="#E98A8A"/><rect x="30" y="52" width="28" height="4" rx="2" fill="#4E9BAE"/><path d="M28 60 l16 30 16 -30z" fill="#F08B8B"/><rect x="4" y="30" width="10" height="16" rx="3" fill="#4E9BAE"/><rect x="74" y="30" width="10" height="16" rx="3" fill="#4E9BAE"/></svg>
+<svg style="position: absolute; right: -10px; top: -8px; z-index: 2; filter: url(#la-wc); opacity: 0.88" width="96" height="96" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="42" fill="#F3B562"/><path d="M14 30 q34 16 68 0 M10 56 q38 18 76 0" fill="none" stroke="#7FC8D8" stroke-width="10"/><circle cx="62" cy="30" r="8" fill="#FFFFFF" opacity="0.5"/></svg>
+<svg style="position: absolute; left: -4px; top: 30%; z-index: 2; filter: url(#la-wc); opacity: 0.88" width="74" height="96" viewBox="0 0 74 96" aria-hidden="true"><path d="M10 8 l40 28 M24 2 l40 28" stroke="#C99A5B" stroke-width="4" stroke-linecap="round"/><ellipse cx="37" cy="42" rx="32" ry="10" fill="#F6E3C8"/><path d="M5 42 v38 a32 10 0 0 0 64 0 v-38" fill="#E98A8A"/><path d="M5 54 h64 v14 h-64z" fill="#8DB7E6"/><path d="M5 52 l16 28 16 -28 16 28 16 -28" fill="none" stroke="#F3B562" stroke-width="3"/></svg>
+<svg style="position: absolute; right: -6px; top: 34%; z-index: 2; filter: url(#la-wc); opacity: 0.88" width="80" height="96" viewBox="0 0 80 96" aria-hidden="true"><rect x="10" y="40" width="60" height="52" rx="4" fill="#7FC8D8"/><rect x="10" y="40" width="60" height="10" fill="#E98A8A"/><circle cx="40" cy="22" r="14" fill="#F6D2B0"/><path d="M26 18 q14 -22 28 0" fill="#F3B562"/><circle cx="35" cy="22" r="1.8" fill="#5A4636"/><circle cx="45" cy="22" r="1.8" fill="#5A4636"/><path d="M36 28 q4 3 8 0" fill="none" stroke="#E98A8A" stroke-width="2"/><path d="M36 36 l4 6 4 -6" fill="#E98A8A"/></svg>
+<svg style="position: absolute; left: 2px; bottom: 6px; z-index: 2; filter: url(#la-wc); opacity: 0.88" width="104" height="92" viewBox="0 0 104 92" aria-hidden="true"><path d="M8 82 q44 18 88 0" fill="none" stroke="#C99A5B" stroke-width="6" stroke-linecap="round"/><path d="M24 80 l8 -26 M78 80 l-8 -26" stroke="#C99A5B" stroke-width="5"/><path d="M26 56 q4 -16 26 -16 h20 q8 -20 18 -24 q6 8 2 18 l-6 6 q4 10 -4 16 h-56z" fill="#F0C48F"/><path d="M82 16 q-14 6 -12 26" fill="none" stroke="#8C5A33" stroke-width="5"/><circle cx="86" cy="24" r="2" fill="#5A4636"/></svg>
+<svg style="position: absolute; left: 34%; bottom: -8px; z-index: 2; filter: url(#la-wc); opacity: 0.9" width="120" height="110" viewBox="0 0 120 110" aria-hidden="true"><circle cx="30" cy="22" r="14" fill="#E7B07A"/><circle cx="90" cy="22" r="14" fill="#E7B07A"/><circle cx="30" cy="22" r="7" fill="#F2C9A1"/><circle cx="90" cy="22" r="7" fill="#F2C9A1"/><circle cx="60" cy="48" r="34" fill="#F0BE88"/><ellipse cx="60" cy="60" rx="15" ry="11" fill="#F7DABB"/><circle cx="48" cy="42" r="3.5" fill="#3A2E28"/><circle cx="72" cy="42" r="3.5" fill="#3A2E28"/><ellipse cx="60" cy="55" rx="5" ry="3.5" fill="#3A2E28"/><circle cx="40" cy="56" r="5" fill="#F3A6A0" opacity="0.6"/><circle cx="80" cy="56" r="5" fill="#F3A6A0" opacity="0.6"/><path d="M34 82 q26 12 52 0 l-4 10 q-22 8 -44 0z" fill="#7FC8D8"/><ellipse cx="60" cy="104" rx="40" ry="16" fill="#F0BE88"/></svg>
+<svg style="position: absolute; right: 4px; bottom: -4px; z-index: 2; filter: url(#la-wc); opacity: 0.88" width="76" height="110" viewBox="0 0 76 110" aria-hidden="true"><rect x="24" y="2" width="28" height="24" rx="3" fill="#E98A8A"/><rect x="22" y="22" width="32" height="6" fill="#F3B562"/><rect x="24" y="28" width="28" height="22" rx="4" fill="#F6D2B0"/><circle cx="32" cy="37" r="2" fill="#3A2E28"/><circle cx="44" cy="37" r="2" fill="#3A2E28"/><path d="M28 44 q10 6 20 0" fill="none" stroke="#3A2E28" stroke-width="3"/><rect x="18" y="50" width="40" height="40" rx="4" fill="#E98A8A"/><path d="M38 50 v40" stroke="#F3B562" stroke-width="3"/><g fill="#F3B562"><circle cx="31" cy="60" r="2"/><circle cx="31" cy="72" r="2"/><circle cx="45" cy="60" r="2"/><circle cx="45" cy="72" r="2"/></g><rect x="20" y="90" width="14" height="18" fill="#4E9BAE"/><rect x="42" y="90" width="14" height="18" fill="#4E9BAE"/></svg>
+</sc-if>
+
+<!-- ============ PAPER + CONTENT ============ -->
+<div style="{{paperStyle}}">
+<div style="{{contentStyle}}">
+<p style="{{greetStyle}}">{{greeting}}</p>
+<sc-if value="{{full}}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{intro}}" hint-placeholder-val="{{ true }}"><p style="margin: 0">{{intro}}</p></sc-if>
+<p style="margin: 0; white-space: pre-wrap; opacity: {{msgOpacity}}">{{message}}</p>
+<p style="margin: 0">Esta es mi lista de regalos:</p>
+<ol style="margin: 0; padding-left: 30px">
+<sc-for list="{{giftList}}" as="g" hint-placeholder-count="3"><li>{{g.text}}</li></sc-for>
+</ol>
+<sc-if value="{{noGifts}}" hint-placeholder-val="{{ false }}"><p style="margin: 0; opacity: 0.5">(Tu lista aparecerá aquí)</p></sc-if>
+<p style="margin: 0">{{farewell}}</p>
+<p style="{{signStyle}}">{{signOff}}</p>
+</sc-if>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"design":{"editor":"enum","options":["clasica","taller","estrellas","polonorte","juguetes"],"default":"clasica"},"mini":{"editor":"boolean","default":false},"greeting":{"editor":null},"intro":{"editor":null},"message":{"editor":null},"gifts":{"editor":null},"farewell":{"editor":null},"signOff":{"editor":null},"dim":{"editor":null},"$preview":{"width":520,"height":700}}'>
+var LA = {
+  clasica: {
+    root: 'background: repeating-linear-gradient(45deg,#C8302B 0 22px,#F7F1E3 22px 34px,#2F8A4A 34px 56px,#F7F1E3 56px 68px); padding: 22px;',
+    paper: 'background-color: #FBF6EA; background-image: radial-gradient(rgba(170,150,110,0.12) 1px, transparent 1.6px); background-size: 9px 11px; padding: 150px 34px 96px;',
+    line: '#E9B98A', ink: '#3A2E22',
+    greet: "font-family: 'Pinyon Script', cursive; font-size: 40px; color: #C8302B; line-height: 64px;",
+    sign: "font-family: 'Patrick Hand', cursive; font-size: 26px; color: #C8302B;"
+  },
+  taller: {
+    root: 'background: repeating-linear-gradient(90deg,#7A4A26 0 46px,#6B3F1F 46px 48px,#86552D 48px 94px,#6B3F1F 94px 96px); padding: 84px 30px 120px;',
+    paper: 'background-color: #F5E8CD; background-image: radial-gradient(ellipse at center, rgba(255,255,255,0.4), rgba(160,110,50,0.18)); padding: 32px 30px 40px; border-radius: 4px; box-shadow: 0 6px 16px rgba(40,20,0,0.35);',
+    line: '#DCC69C', ink: '#3A2614',
+    greet: "font-family: 'Fraunces', serif; font-style: italic; font-weight: 700; font-size: 30px; color: #7A2A20; line-height: 64px;",
+    sign: "font-family: 'Patrick Hand', cursive; font-size: 26px; color: #7A2A20;"
+  },
+  estrellas: {
+    root: 'background: radial-gradient(#FFFFFF 1.2px, transparent 1.7px) 0 0/38px 38px, radial-gradient(#F5C84B 1.6px, transparent 2px) 19px 23px/61px 61px, #1B3A57; padding: 76px 62px 84px;',
+    paper: 'background-color: #FFFFFF; padding: 40px 30px 40px;',
+    line: '#C7DCE0', ink: '#1F2A44',
+    greet: "font-family: 'Patrick Hand', cursive; font-size: 30px; color: #1B3A57; line-height: 64px;",
+    sign: "font-family: 'Patrick Hand', cursive; font-size: 26px; color: #D9312B;"
+  },
+  polonorte: {
+    root: 'background: #AEDDEC; padding: 124px 28px 130px;',
+    paper: 'background-color: #FFFFFF; padding: 44px 40px 52px; border-radius: 70px 110px 80px 120px / 80px 70px 110px 70px;',
+    line: '#B9E1EE', ink: '#23485A',
+    greet: "font-family: 'Patrick Hand', cursive; font-size: 30px; color: #2E4756; line-height: 64px;",
+    sign: "font-family: 'Patrick Hand', cursive; font-size: 26px; color: #E7633C;"
+  },
+  juguetes: {
+    root: 'background: #FBF8F2; padding: 84px 70px 116px;',
+    paper: 'background-color: transparent; padding: 8px 6px 16px;',
+    line: '#E2E2E8', ink: '#4A4440',
+    greet: "font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 30px; color: #5E5852; line-height: 64px; text-align: center;",
+    sign: "font-family: 'Patrick Hand', cursive; font-size: 26px; color: #E07272;"
+  }
+};
+class Component extends DCLogic {
+  renderVals() {
+    var p = this.props;
+    var id = LA[p.design] ? p.design : 'clasica';
+    var s = LA[id];
+    var mini = !!p.mini;
+    var gifts = Array.isArray(p.gifts) ? p.gifts : [];
+    return {
+      isClasica: id === 'clasica', isTaller: id === 'taller', isEstrellas: id === 'estrellas', isPolo: id === 'polonorte', isJuguetes: id === 'juguetes',
+      rootStyle: 'position: relative; width: 100%; min-height: ' + (mini ? '480px' : '680px') + '; box-sizing: border-box; overflow: hidden; border-radius: 6px; display: flex; flex-direction: column; ' + s.root,
+      paperStyle: 'position: relative; z-index: 1; flex: 1; box-sizing: border-box; display: flex; flex-direction: column; ' + s.paper,
+      contentStyle: 'font-family: \'Patrick Hand\', cursive; font-size: 21px; line-height: 32px; color: ' + s.ink + '; flex: 1; display: flex; flex-direction: column; overflow-wrap: anywhere; background-image: repeating-linear-gradient(to bottom, transparent 0 31px, ' + s.line + ' 31px 32px); background-position: 0 0;',
+      greetStyle: 'margin: 0; ' + s.greet,
+      signStyle: 'margin: 0; ' + s.sign,
+      full: !mini,
+      greeting: p.greeting || 'Querido Santa:',
+      intro: p.intro || '',
+      message: p.message || '',
+      msgOpacity: p.dim ? 0.5 : 1,
+      giftList: gifts.map(function (g) { return { text: g }; }),
+      noGifts: !mini && gifts.length === 0,
+      farewell: p.farewell || '',
+      signOff: p.signOff || ''
+    };
+  }
+}
+</script>
+</body>
+</html>
