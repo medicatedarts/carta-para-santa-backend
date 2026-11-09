@@ -85,7 +85,8 @@ app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), async
   if (event.type !== 'checkout.session.completed') return;
   const session = event.data.object;
   const orderId = session.metadata && session.metadata.orderId;
-  if (!orderId || session.payment_status !== 'paid') return;
+  // "no_payment_required": la orden se cubrió completa con un código de descuento (p. ej. 100% familia).
+  if (!orderId || !['paid', 'no_payment_required'].includes(session.payment_status)) return;
 
   setImmediate(async () => {
     try {
@@ -216,6 +217,8 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
+      // Los códigos (p. ej. el de 100% para familiares) se crean en Stripe → Product catalog → Coupons.
+      allow_promotion_codes: true,
       customer_email: data.buyer.email,
       line_items: [{
         price_data: {

@@ -74,7 +74,7 @@ function orderConfirmation(order) {
 <tr><td style="color:#5A645F">Orden</td><td><strong>${esc(order.order_number)}</strong></td></tr>
 <tr><td style="color:#5A645F">Diseño</td><td>${esc(DESIGN_NAMES[order.design] || order.design)}</td></tr>
 <tr><td style="color:#5A645F">Para</td><td>${esc(order.ship_name)}<br>${esc(order.ship_line1)}${order.ship_line2 ? '<br>' + esc(order.ship_line2) : ''}<br>${esc(order.ship_city)}, ${esc(order.ship_state)} ${esc(order.ship_zip)}</td></tr>
-<tr><td style="color:#5A645F">Total</td><td>${money(order.amount_cents)}</td></tr>
+<tr><td style="color:#5A645F">Total</td><td>${order.amount_cents ? money(order.amount_cents) : 'Gratis (código de descuento)'}</td></tr>
 </table>
 <p style="font-size:15px;line-height:1.6">Te escribiremos otra vez cuando la carta salga del Polo Norte. Llega por correo postal en un sobre blanco con ventana, con la respuesta de Santa y una copia de la carta original.</p>
 <p style="font-size:13px;line-height:1.6;color:#5A645F">Para hacer la carta guardamos ${esc(childData)}. Lo usamos solo para imprimirla y lo borramos después de la entrega, según nuestra política de privacidad.</p>`),
