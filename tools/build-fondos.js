@@ -47,21 +47,24 @@ ${papeles.defs}${d.decor}
   };
 }
 
+// Caja del logo en px CSS (96 por pulgada): 2.4" de ancho, centrado sobre la fecha (x 6.66").
+const LOGO_RATIO = (() => { const b = fs.readFileSync(path.join(__dirname, '..', 'papeles', 'logo-taller.png')); return b.readUInt32BE(20) / b.readUInt32BE(16); })();
+const LOGO = { w: 230, h: Math.round(230 * LOGO_RATIO), top: 44 };
+LOGO.left = Math.round(6.66 * 96 - LOGO.w / 2);
+
 // Fondo de la respuesta de Santa (sin texto ni fecha; la zona de dirección queda limpia)
 fs.writeFileSync(path.join(out, 'santa.html'), `${head}<div class="page" style="background:#FFFDF7;font-family:Georgia,serif">
 <div style="position:absolute;inset:22px;border:6px solid transparent;border-image:repeating-linear-gradient(45deg,#B3261E 0 12px,#FFFDF7 12px 18px,#1F6B47 18px 30px,#FFFDF7 30px 36px) 6"></div>
 <div style="position:absolute;inset:36px;border:1.5px solid #C9A24A"></div>
 <div style="position:absolute;left:0;top:0;width:408px;height:283px;background:#FFFDF7"></div>
-<div style="position:absolute;right:64px;top:62px;width:300px;text-align:center">
-<svg width="86" height="86" viewBox="0 0 86 86"><circle cx="43" cy="43" r="40" fill="#B3261E"/><circle cx="43" cy="43" r="33" fill="none" stroke="#E2C27A" stroke-width="1.5" stroke-dasharray="2 4"/><path d="M43 18l5.6 15.4L64 39l-15.4 5.6L43 60l-5.6-15.4L22 39l15.4-5.6z" fill="#F3D58A"/><path d="M28 64 h30" stroke="#F3D58A" stroke-width="2" stroke-linecap="round"/></svg>
-<p style="margin:10px 0 0;font-family:Fraunces;font-weight:700;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:#1F6B47">Taller de Santa Claus</p>
-<p style="margin:2px 0 0;font-family:Fraunces;font-weight:700;font-size:30px;line-height:1.05;color:#0F3324">Polo Norte</p></div>
+<!-- Logo "El Taller del Polo Norte" (papeles/logo-taller.png), centrado sobre la fecha -->
+<img src="file://${path.join(__dirname, '..', 'papeles', 'logo-taller.png')}" style="position:absolute;left:${LOGO.left}px;top:${LOGO.top}px;width:${LOGO.w}px;height:${LOGO.h}px">
 <svg style="position:absolute;left:298px;bottom:46px" width="220" height="24" viewBox="0 0 220 24"><path d="M0 12h86M134 12h86" stroke="#C9A24A" stroke-width="1.5"/><path d="M110 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#C9A24A"/><circle cx="94" cy="12" r="2.5" fill="#B3261E"/><circle cx="126" cy="12" r="2.5" fill="#1F6B47"/></svg>
 </div></body></html>`);
 layout.santa = {
   image: 'santa.jpg',
   addressZone: { x: 0, y: 0, w: 4.25, h: 2.95 },
-  date: { x: 5.1, y: 2.12, w: 3.125, color: '#6B5016' },
+  date: { x: 5.1, y: 2.22, w: 3.125, color: '#6B5016' },
   textBox: { x: 1.0, y: 3.125, w: 6.5, h: 6.9 },
 };
 fs.writeFileSync(path.join(__dirname, '..', 'papeles', 'layout.json'), JSON.stringify(layout, null, 2));

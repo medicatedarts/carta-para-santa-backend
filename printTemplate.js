@@ -116,31 +116,42 @@ function fitText(order, d) {
   return { pt, lh };
 }
 
+// El motor de Lob (WebKit viejo) acomoda los renglones en píxeles CSS ENTEROS (96 por pulgada).
+// Si el alto de renglón es fraccionario (p. ej. 0.3" = 28.8 px), cada renglón de texto se
+// redondea y se va corriendo contra las líneas dibujadas. Por eso todo va en px enteros.
+const PX = 96;
+
 function childPage(order, a) {
   const d = layout.designs[order.design] || layout.designs.clasica;
-  const { pt, lh } = fitText(order, d);
+  const fit = fitText(order, d);
+  const pt = fit.pt;
+  const lhPx = Math.round(fit.lh * PX);
   const gifts = Array.isArray(order.gifts) ? order.gifts : [];
   const intro = introLine(order);
   const tb = d.textBox;
+  const top = Math.round(tb.y * PX);
+  const left = Math.round(tb.x * PX);
+  const width = Math.round(tb.w * PX);
+  const height = Math.round(tb.h * PX);
 
-  // Renglones del papel: divs de 1 px (compatibles con el motor de Lob; nada de degradados).
+  // Renglones del papel: divs de 1 px en la base de cada renglón de texto.
   const ruled = [];
-  const n = Math.floor(tb.h / lh);
+  const n = Math.floor(height / lhPx);
   for (let i = 1; i <= n; i++) {
-    ruled.push(`<div class="rule" style="left:${tb.x}in;top:${r3(tb.y + i * lh - 0.01)}in;width:${tb.w}in;background:${d.line}"></div>`);
+    ruled.push(`<div class="rule" style="left:${left}px;top:${top + i * lhPx - 1}px;width:${width}px;background:${d.line}"></div>`);
   }
 
   const greetStyle = [
     `font-family:'${d.greetFont}'`,
     `font-size:${r3(pt * (d.greetFont === 'Pinyon Script' ? 1.45 : 1.3))}pt`,
-    `line-height:${r3(lh * 2)}in`,
+    `line-height:${lhPx * 2}px`,
     `color:${d.greetColor}`,
     d.greetItalic ? 'font-style:italic' : '',
     d.greetBold ? 'font-weight:700' : '',
     d.greetCenter ? 'text-align:center' : '',
   ].filter(Boolean).join(';');
 
-  const p = (txt, extra = '') => `<p style="margin:0;line-height:${lh}in;${extra}">${txt}</p>`;
+  const p = (txt, extra = '') => `<p style="margin:0;line-height:${lhPx}px;${extra}">${txt}</p>`;
   const body = [
     `<p style="margin:0;${greetStyle}">${esc(order.greeting || 'Querido Santa:')}</p>`,
     intro ? p(esc(intro)) : '',
@@ -155,7 +166,7 @@ function childPage(order, a) {
 <div class="page">
   <img class="bg" src="${a.fondos}/${d.image}" alt="">
   ${ruled.join('')}
-  <div class="abs child-text" style="${box(tb)}font-size:${pt}pt;color:${d.ink}">${body}</div>
+  <div class="abs child-text" style="left:${left}px;top:${top}px;width:${width}px;height:${height}px;font-size:${pt}pt;color:${d.ink}">${body}</div>
 </div>`;
 }
 
