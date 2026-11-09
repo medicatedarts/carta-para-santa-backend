@@ -14,6 +14,8 @@ const order = {
 test('createLetter manda los parámetros acordados y el Idempotency-Key', async () => {
   process.env.LOB_API_KEY = 'test_abc';
   process.env.LOB_FROM_ADDRESS_ID = 'adr_santa';
+  process.env.BACKEND_PUBLIC_URL = 'https://api.cartaparasanta.com';
+  process.env.ADMIN_TOKEN = 'secreto-admin';
   let captured;
   global.fetch = async (url, init) => {
     captured = { url, init };
@@ -28,9 +30,8 @@ test('createLetter manda los parámetros acordados y el Idempotency-Key', async 
   assert.strictEqual(body.color, true);
   assert.strictEqual(body.from, 'adr_santa');
   assert.strictEqual(body.metadata.orderId, order.id);
-  assert.match(body.file, /class="page santa"/);
-  assert.match(body.file, /class="page child"/);
-  assert.doesNotMatch(body.file, /Lob imprime aquí/); // la marca de preview no va a impresión
+  // Lob recibe una URL firmada del backend (el HTML directo no puede pasar de 10,000 caracteres)
+  assert.match(body.file, new RegExp(`^https://api\\.cartaparasanta\\.com/print/order/${order.id}\\?exp=\\d+&sig=[0-9a-f]{64}$`));
   assert.deepStrictEqual(r, { id: 'ltr_1', expectedDelivery: '2026-12-01', price: 1.89, url: null });
 });
 
@@ -51,4 +52,26 @@ test('verifyWebhook acepta la firma correcta y rechaza la incorrecta o vieja', (
   const old = String(Date.now() - 60 * 60 * 1000);
   const sigOld = crypto.createHmac('sha256', 'secreto').update(`${old}.${raw}`).digest('hex');
   assert.strictEqual(lob.verifyWebhook(raw, { 'lob-signature': sigOld, 'lob-signature-timestamp': old }), false);
+});
+
+test('URL de impresión: firma válida, alterada y vencida', () => {
+  const printUrl = require('../printUrl');
+  process.env.BACKEND_PUBLIC_URL = 'https://api.cartaparasanta.com';
+  process.env.ADMIN_TOKEN = 'secreto-admin';
+  const u = new URL(printUrl.orderPrintUrl('abc'));
+  assert.strictEqual(printUrl.verify(u.pathname, u.searchParams.get('exp'), u.searchParams.get('sig')), true);
+  assert.strictEqual(printUrl.verify('/print/order/otra', u.searchParams.get('exp'), u.searchParams.get('sig')), false);
+  assert.strictEqual(printUrl.verify(u.pathname, '1000', u.searchParams.get('sig')), false);
+});
+
+test('el HTML de impresión es grande: por eso va por URL y no directo', () => {
+  const { buildPrintHtml } = require('../printTemplate');
+  const { sampleOrder } = require('../samples');
+  for (const d of ['clasica', 'taller', 'estrellas', 'polonorte', 'juguetes']) {
+    const html = buildPrintHtml(sampleOrder(d, 'larga'));
+    assert.ok(html.length > 10000);
+    assert.match(html, /class="page santa"/);
+    assert.match(html, /class="page child"/);
+    assert.doesNotMatch(html, /Lob imprime aquí/);
+  }
 });

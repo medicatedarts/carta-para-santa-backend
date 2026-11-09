@@ -16,6 +16,9 @@ const db = require('./db');
 const { validateCheckout } = require('./validate');
 const { checkContent } = require('./contentFilter');
 const { buildPrintHtml } = require('./printTemplate');
+const printUrl = require('./printUrl');
+const { sampleOrder } = require('./samples');
+const { DESIGNS } = require('./validate');
 const lob = require('./lob');
 const email = require('./email');
 const { sendToLob, afterPaid } = require('./fulfill');
@@ -37,6 +40,27 @@ app.use(cors({ origin: origins }));
 
 // Fuentes para la impresión (Lob las descarga desde aquí si están en fonts/).
 app.use('/fonts', express.static(path.join(__dirname, 'fonts'), { maxAge: '30d' }));
+
+// ---------------------------------------------------------------------------
+// HTML de impresión para Lob (URL firmada y con vencimiento, ver printUrl.js).
+// ---------------------------------------------------------------------------
+app.get('/print/order/:id', async (req, res) => {
+  if (!printUrl.verify(req.path, req.query.exp, req.query.sig)) return res.status(403).send('Enlace inválido o vencido');
+  try {
+    const order = await db.getOrder(req.params.id);
+    if (!order || order.purged_at) return res.status(404).send('No encontrada');
+    res.set('Cache-Control', 'private, no-store').type('html').send(buildPrintHtml(order));
+  } catch (err) {
+    console.error('Error sirviendo la carta para imprimir:', err.message);
+    res.status(500).send('Error');
+  }
+});
+
+app.get('/print/sample/:design/:size', (req, res) => {
+  if (!printUrl.verify(req.path, req.query.exp, req.query.sig)) return res.status(403).send('Enlace inválido o vencido');
+  if (!DESIGNS.includes(req.params.design) || !['corta', 'larga'].includes(req.params.size)) return res.status(404).send('No encontrada');
+  res.set('Cache-Control', 'private, no-store').type('html').send(buildPrintHtml(sampleOrder(req.params.design, req.params.size)));
+});
 
 // ---------------------------------------------------------------------------
 // Webhooks: necesitan el body crudo para verificar la firma, así que van ANTES
@@ -269,13 +293,7 @@ admin.get('/orders/:id/preview', async (req, res) => {
 
 // Carta de ejemplo de cualquier diseño, para revisar la impresión sin crear órdenes.
 admin.get('/sample/:design', (req, res) => {
-  res.type('html').send(buildPrintHtml({
-    id: 'muestra-' + req.params.design, order_number: 'PN-00000', design: req.params.design,
-    greeting: 'Querido Santa:', child_name: 'Sofía', child_age: 7,
-    message: 'Este año me porté muy bien y ayudé a mi mamá con mi hermanito. ¿Cómo están Rodolfo y los demás renos?',
-    gifts: ['Una bicicleta roja', 'Un set de pintura', 'Un libro de dinosaurios'],
-    farewell: 'Con mucho cariño,', signature: 'Sofía', ship_name: 'Sofía Rivera',
-  }, { preview: true }));
+  res.type('html').send(buildPrintHtml(sampleOrder(req.params.design, req.query.size === 'larga' ? 'larga' : 'corta'), { preview: true }));
 });
 
 admin.post('/orders/:id/approve', async (req, res) => {

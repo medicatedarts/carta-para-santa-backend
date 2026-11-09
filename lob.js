@@ -7,7 +7,7 @@
 //    permanentes (dirección inválida) esperan a que los corrijas en el panel.
 
 const crypto = require('crypto');
-const { buildPrintHtml } = require('./printTemplate');
+const { orderPrintUrl } = require('./printUrl');
 
 function fromAddress() {
   if (process.env.LOB_FROM_ADDRESS_ID) return process.env.LOB_FROM_ADDRESS_ID;
@@ -26,9 +26,11 @@ function fromAddress() {
  * Crea la carta en Lob.
  * @param {Object} order - fila de orders
  * @param {string} idempotencyKey - normalmente el id de la orden
+ * @param {Object} [opts]
+ * @param {string} [opts.fileUrl] URL del HTML a imprimir (por defecto la URL firmada de la orden)
  * @returns {Promise<{ id, expectedDelivery, price, url }>}
  */
-async function createLetter(order, idempotencyKey) {
+async function createLetter(order, idempotencyKey, { fileUrl } = {}) {
   const apiKey = process.env.LOB_API_KEY;
   if (!apiKey) throw Object.assign(new Error('LOB_API_KEY no configurada'), { retryable: false });
 
@@ -44,7 +46,9 @@ async function createLetter(order, idempotencyKey) {
       address_country: order.ship_country || 'US',
     },
     from: fromAddress(),
-    file: buildPrintHtml(order),
+    // Lob limita el HTML directo a 10,000 caracteres: se le pasa una URL firmada de este
+    // backend (GET /print/order/:id) desde donde descarga la carta.
+    file: fileUrl || orderPrintUrl(order.id),
     color: true,
     double_sided: false,
     // Lob imprime la dirección arriba de la página 1 (se ve por la ventana del sobre

@@ -19,8 +19,13 @@
 //   --dry           no llama a Lob: guarda el HTML en previews/ para abrirlo en el navegador
 //   --yes           no pide confirmación al usar la clave live
 //
-// Variables que usa (de .env): LOB_API_KEY, LOB_FROM_ADDRESS_ID (o LOB_FROM_*),
-// BACKEND_PUBLIC_URL (para las fuentes de fonts/; si no, se usan las de Google Fonts).
+// Variables que usa (de .env):
+//   LOB_API_KEY, LOB_FROM_ADDRESS_ID (o LOB_FROM_*)
+//   BACKEND_PUBLIC_URL=https://api.cartaparasanta.com  y  ADMIN_TOKEN (el mismo de Render)
+//
+// Lob no acepta HTML de más de 10,000 caracteres, así que descarga la carta de ejemplo
+// desde el backend en Render (GET /print/sample/<diseño>/<corta|larga>, con URL firmada).
+// Por eso el backend tiene que estar desplegado y ADMIN_TOKEN debe ser igual al de Render.
 
 try { require('dotenv').config(); } catch (_) { /* sin dotenv: se usan las variables del sistema */ }
 
@@ -29,6 +34,7 @@ const path = require('path');
 const crypto = require('crypto');
 const readline = require('readline');
 const { createLetter } = require('../lob');
+const { samplePrintUrl } = require('../printUrl');
 const { buildPrintHtml } = require('../printTemplate');
 const { DESIGNS, US_STATES } = require('../validate');
 
@@ -39,21 +45,7 @@ function arg(name) {
   return v && !v.startsWith('--') ? v : true;
 }
 
-const SAMPLE_SHORT = {
-  greeting: 'Querido Santa:', child_name: 'Sofía', child_age: 7,
-  message: 'Este año me porté muy bien y ayudé a mi mamá con mi hermanito. ¿Cómo están Rodolfo y los demás renos?',
-  gifts: ['Una bicicleta roja', 'Un set de pintura', 'Un libro de dinosaurios'],
-  farewell: 'Con mucho cariño,', signature: 'Sofía',
-};
-
-const SAMPLE_LONG = {
-  greeting: 'Querido Santa Claus:', child_name: 'Sebastián Alejandro', child_age: 10,
-  message: ('Este año fue muy especial. Empecé quinto grado, aprendí a nadar sin flotadores y ayudé a mi abuela a sembrar ' +
-    'tomates en el patio. A veces peleé con mi hermana, pero siempre le pedí perdón. También leí muchos libros, mi favorito ' +
-    'fue uno de dragones. Te quería contar que mi perro Coco aprendió a sentarse. ').repeat(2).slice(0, 700),
-  gifts: Array.from({ length: 12 }, (_, i) => `Regalo número ${i + 1} con un nombre bastante largo para probar`.slice(0, 60)),
-  farewell: 'Con todo mi cariño y un abrazo,', signature: 'Sebastián',
-};
+const { SAMPLES } = require('../samples');
 
 function parseTo(str) {
   const [name, line1, line2, city, state, zip] = String(str).split('|').map((s) => (s || '').trim());
@@ -76,7 +68,8 @@ function ask(question) {
     console.error(`Diseño desconocido: ${designArg}. Opciones: ${DESIGNS.join(', ')}, todos`);
     process.exit(1);
   }
-  const sample = arg('larga') ? SAMPLE_LONG : SAMPLE_SHORT;
+  const size = arg('larga') ? 'larga' : 'corta';
+  const sample = SAMPLES[size];
   const dry = Boolean(arg('dry'));
 
   let to = { name: 'Sofía Rivera', line1: 'Calle 1 #23', line2: '', city: 'Arecibo', state: 'PR', zip: '00612' };
@@ -91,6 +84,14 @@ function ask(question) {
     if (!key) { console.error('Falta LOB_API_KEY en .env'); process.exit(1); }
     if (!process.env.LOB_FROM_ADDRESS_ID && !process.env.LOB_FROM_ADDRESS_LINE1) {
       console.error('Falta el remitente: LOB_FROM_ADDRESS_ID (o los campos LOB_FROM_*) en .env');
+      process.exit(1);
+    }
+    if (!/^https:\/\//.test(process.env.BACKEND_PUBLIC_URL || '')) {
+      console.error('Falta BACKEND_PUBLIC_URL=https://api.cartaparasanta.com en .env (Lob descarga la carta desde el backend)');
+      process.exit(1);
+    }
+    if (!process.env.PRINT_URL_SECRET && !process.env.ADMIN_TOKEN) {
+      console.error('Falta ADMIN_TOKEN en .env (el mismo valor que en Render) para firmar la URL de la carta');
       process.exit(1);
     }
     const live = key.startsWith('live_');
@@ -124,7 +125,7 @@ function ask(question) {
 
     try {
       // Llave única por envío de prueba: cada corrida crea una carta nueva.
-      const letter = await createLetter(order, `prueba-${order.id}`);
+      const letter = await createLetter(order, `prueba-${order.id}`, { fileUrl: samplePrintUrl(design, size) });
       console.log(`✅ ${design}: ${letter.id} · entrega estimada ${letter.expectedDelivery || 'n/d'} · precio ${letter.price ?? 'n/d'}`);
       if (letter.url) console.log(`   PDF: ${letter.url}`);
     } catch (err) {
