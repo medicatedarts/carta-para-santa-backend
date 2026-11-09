@@ -1,5 +1,5 @@
 {
-  "generatedFrom": "docs/prototipo/LetterArt.dc.html",
+  "generatedFrom": "Fondos diseñados por Angel (9 nov 2026). No correr tools/build-fondos.js: sobrescribe este archivo.",
   "pageInches": {
     "w": 8.5,
     "h": 11
@@ -8,10 +8,10 @@
     "clasica": {
       "image": "papel-clasica.jpg",
       "textBox": {
-        "x": 0.938,
+        "x": 1.0,
         "y": 2.75,
-        "w": 6.625,
-        "h": 6.344
+        "w": 6.5,
+        "h": 6.4
       },
       "ink": "#3A2E22",
       "line": "#E9B98A",
@@ -25,10 +25,10 @@
     "taller": {
       "image": "papel-taller.jpg",
       "textBox": {
-        "x": 1,
-        "y": 1.875,
+        "x": 1.0,
+        "y": 2.6,
         "w": 6.5,
-        "h": 6.563
+        "h": 5.8
       },
       "ink": "#3A2614",
       "line": "#DCC69C",
@@ -42,10 +42,10 @@
     "estrellas": {
       "image": "papel-estrellas.jpg",
       "textBox": {
-        "x": 1.5,
-        "y": 1.875,
-        "w": 5.5,
-        "h": 7.125
+        "x": 1.45,
+        "y": 1.9,
+        "w": 5.6,
+        "h": 6.55
       },
       "ink": "#1F2A44",
       "line": "#C7DCE0",
@@ -59,10 +59,10 @@
     "polonorte": {
       "image": "papel-polonorte.jpg",
       "textBox": {
-        "x": 1.125,
-        "y": 2.688,
-        "w": 6.25,
-        "h": 5.406
+        "x": 1.0,
+        "y": 2.4,
+        "w": 6.0,
+        "h": 6.2
       },
       "ink": "#23485A",
       "line": "#B9E1EE",
@@ -76,10 +76,10 @@
     "juguetes": {
       "image": "papel-juguetes.jpg",
       "textBox": {
-        "x": 1.25,
-        "y": 1.5,
-        "w": 6,
-        "h": 7.375
+        "x": 1.5,
+        "y": 2.15,
+        "w": 5.5,
+        "h": 7.1
       },
       "ink": "#4A4440",
       "line": "#E2E2E8",
@@ -100,16 +100,16 @@
       "h": 2.95
     },
     "date": {
-      "x": 5.1,
-      "y": 2.22,
+      "x": 4.83,
+      "y": 2.3,
       "w": 3.125,
       "color": "#6B5016"
     },
     "textBox": {
-      "x": 1,
+      "x": 1.0,
       "y": 3.125,
       "w": 6.5,
-      "h": 6.9
+      "h": 6.6
     }
   }
 }

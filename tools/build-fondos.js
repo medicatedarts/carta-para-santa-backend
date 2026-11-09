@@ -1,4 +1,6 @@
 // tools/build-fondos.js
+// ⚠️ OBSOLETO desde el 9 nov 2026: los fondos ahora son diseños propios (papeles/fondos/*.jpg).
+//    Correr esto sobrescribiría papeles/layout.json; no lo uses salvo para volver al prototipo.
 // Genera las páginas HTML (sin texto) de los fondos actuales y papeles/layout.json con la
 // caja de texto de cada diseño. Luego tools/render-fondos.py las convierte en imágenes
 // de 2550×3300 px (8.5×11" a 300 ppp). Solo hace falta para regenerar los fondos a partir
