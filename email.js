@@ -26,6 +26,9 @@ async function send({ to, subject, html }) {
       body: JSON.stringify({
         from: process.env.EMAIL_FROM || 'Taller de Santa <hola@cartaparasanta.com>',
         to: Array.isArray(to) ? to : [to],
+        // Los correos salen de un subdominio que solo envía; las respuestas de los
+        // padres van a una dirección que sí recibe (y se reenvía a tu Gmail).
+        ...(process.env.EMAIL_REPLY_TO ? { reply_to: process.env.EMAIL_REPLY_TO } : {}),
         subject,
         html,
       }),
