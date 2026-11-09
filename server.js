@@ -383,6 +383,78 @@ admin.post('/orders/:id/refund', async (req, res) => {
 });
 
 admin.get('/stats', async (_req, res) => res.json(await db.stats()));
+
+// Revisión de la configuración de producción, para el panel. Solo dice si cada pieza está
+// bien (y en qué modo), nunca devuelve claves ni direcciones completas.
+admin.get('/check', async (_req, res) => {
+  const items = [];
+  const add = (group, label, status, detail = '') => items.push({ group, label, status, detail });
+  const mode = (k, live, test) => (!k ? 'falta' : k.startsWith(live) ? 'live' : k.startsWith(test) ? 'test' : 'desconocido');
+
+  // --- Lob ---
+  const lobKey = process.env.LOB_API_KEY || '';
+  const lobMode = mode(lobKey, 'live_', 'test_');
+  add('Lob', 'Clave de Lob', lobMode === 'live' ? 'ok' : lobMode === 'test' ? 'warn' : 'error', `modo ${lobMode}`);
+  const adr = process.env.LOB_FROM_ADDRESS_ID || '';
+  if (!adr) add('Lob', 'Remitente', 'error', 'falta LOB_FROM_ADDRESS_ID');
+  else if (lobKey) {
+    try {
+      const r = await fetch(`https://api.lob.com/v1/addresses/${encodeURIComponent(adr)}`, {
+        headers: { Authorization: 'Basic ' + Buffer.from(lobKey + ':').toString('base64') },
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) add('Lob', 'Remitente', 'ok', `${j.name || ''}${j.company ? ' · ' + j.company : ''} · ${j.address_city || ''}, ${j.address_state || ''}`);
+      else add('Lob', 'Remitente', 'error', `Lob no encuentra ${adr} con esta clave (¿se creó en el otro modo?)`);
+    } catch (err) {
+      add('Lob', 'Remitente', 'warn', 'no se pudo consultar Lob: ' + err.message);
+    }
+  }
+  add('Lob', 'Secreto del webhook de Lob', process.env.LOB_WEBHOOK_SECRET ? 'ok' : 'warn',
+    process.env.LOB_WEBHOOK_SECRET ? 'configurado' : 'falta: no llegarán los avisos de rastreo');
+
+  // --- Stripe ---
+  const sk = process.env.STRIPE_SECRET_KEY || '';
+  const skMode = mode(sk, 'sk_live_', 'sk_test_') === 'desconocido' ? mode(sk, 'rk_live_', 'rk_test_') : mode(sk, 'sk_live_', 'sk_test_');
+  add('Stripe', 'Clave de Stripe', skMode === 'live' ? 'ok' : skMode === 'test' ? 'warn' : 'error', `modo ${skMode}`);
+  if (sk) {
+    try {
+      const acct = await stripe.accounts.retrieve();
+      add('Stripe', 'Cuenta puede cobrar', acct.charges_enabled ? 'ok' : 'error',
+        acct.charges_enabled ? (acct.settings && acct.settings.dashboard && acct.settings.dashboard.display_name) || 'sí' : 'Stripe todavía no permite cobros: completa la activación');
+    } catch (err) {
+      add('Stripe', 'Cuenta puede cobrar', 'error', err.message);
+    }
+    try {
+      const hooks = await stripe.webhookEndpoints.list({ limit: 20 });
+      const mine = hooks.data.filter((h) => /\/api\/webhook\/stripe$/.test(h.url));
+      const good = mine.find((h) => h.status === 'enabled' && (h.enabled_events.includes('checkout.session.completed') || h.enabled_events.includes('*')));
+      add('Stripe', 'Webhook de Stripe', good ? 'ok' : 'error',
+        good ? good.url : mine.length ? 'existe pero está apagado o sin checkout.session.completed' : 'no hay webhook a /api/webhook/stripe en este modo');
+    } catch (err) {
+      add('Stripe', 'Webhook de Stripe', 'warn', 'no se pudo consultar: ' + err.message);
+    }
+    try {
+      const codes = await stripe.promotionCodes.list({ active: true, limit: 10 });
+      add('Stripe', 'Códigos de descuento activos', codes.data.length ? 'ok' : 'warn',
+        codes.data.length ? codes.data.map((c) => `${c.code} (${c.times_redeemed}/${c.max_redemptions || '∞'})`).join(', ') : 'ninguno en este modo');
+    } catch (err) {
+      add('Stripe', 'Códigos de descuento activos', 'warn', err.message);
+    }
+  }
+  const wh = process.env.STRIPE_WEBHOOK_SECRET || '';
+  add('Stripe', 'Secreto del webhook de Stripe', wh.startsWith('whsec_') ? 'ok' : 'error', wh ? 'configurado' : 'falta');
+
+  // --- Correo y URLs ---
+  add('Correo', 'Resend', process.env.RESEND_API_KEY ? 'ok' : 'error', process.env.RESEND_API_KEY ? (process.env.EMAIL_FROM || 'remitente por defecto') : 'falta RESEND_API_KEY');
+  add('Correo', 'Alertas internas', process.env.ALERT_EMAIL ? 'ok' : 'warn', process.env.ALERT_EMAIL ? 'configurado' : 'falta ALERT_EMAIL');
+  add('Sitio', 'BACKEND_PUBLIC_URL', /^https:\/\//.test(process.env.BACKEND_PUBLIC_URL || '') ? 'ok' : 'error', process.env.BACKEND_PUBLIC_URL || 'falta');
+  add('Sitio', 'FRONTEND_URL', /^https:\/\//.test(process.env.FRONTEND_URL || '') ? 'ok' : 'error', process.env.FRONTEND_URL || 'falta');
+  const settings = await db.getSettings();
+  add('Sitio', 'Buzón', settings.mailboxOpen ? 'ok' : 'warn', settings.mailboxOpen ? 'abierto' : 'cerrado');
+  add('Sitio', 'Precio', settings.priceCents >= 50 ? 'ok' : 'error', settings.priceCents ? `${(settings.priceCents / 100).toFixed(2)} USD` : 'falta');
+
+  res.json({ items, allLive: lobMode === 'live' && skMode === 'live' && !items.some((i) => i.status === 'error') });
+});
 admin.get('/settings', async (_req, res) => res.json(await db.getSettings()));
 admin.patch('/settings', async (req, res) => {
   const b = req.body || {};
