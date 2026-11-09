@@ -1,0 +1,115 @@
+{
+  "generatedFrom": "docs/prototipo/LetterArt.dc.html",
+  "pageInches": {
+    "w": 8.5,
+    "h": 11
+  },
+  "designs": {
+    "clasica": {
+      "image": "papel-clasica.jpg",
+      "textBox": {
+        "x": 0.938,
+        "y": 2.75,
+        "w": 6.625,
+        "h": 6.344
+      },
+      "ink": "#3A2E22",
+      "line": "#E9B98A",
+      "greetFont": "Pinyon Script",
+      "greetItalic": false,
+      "greetBold": false,
+      "greetColor": "#C8302B",
+      "greetCenter": false,
+      "signColor": "#C8302B"
+    },
+    "taller": {
+      "image": "papel-taller.jpg",
+      "textBox": {
+        "x": 1,
+        "y": 1.875,
+        "w": 6.5,
+        "h": 6.563
+      },
+      "ink": "#3A2614",
+      "line": "#DCC69C",
+      "greetFont": "Fraunces",
+      "greetItalic": true,
+      "greetBold": true,
+      "greetColor": "#7A2A20",
+      "greetCenter": false,
+      "signColor": "#7A2A20"
+    },
+    "estrellas": {
+      "image": "papel-estrellas.jpg",
+      "textBox": {
+        "x": 1.5,
+        "y": 1.875,
+        "w": 5.5,
+        "h": 7.125
+      },
+      "ink": "#1F2A44",
+      "line": "#C7DCE0",
+      "greetFont": "Patrick Hand",
+      "greetItalic": false,
+      "greetBold": false,
+      "greetColor": "#1B3A57",
+      "greetCenter": false,
+      "signColor": "#D9312B"
+    },
+    "polonorte": {
+      "image": "papel-polonorte.jpg",
+      "textBox": {
+        "x": 1.125,
+        "y": 2.688,
+        "w": 6.25,
+        "h": 5.406
+      },
+      "ink": "#23485A",
+      "line": "#B9E1EE",
+      "greetFont": "Patrick Hand",
+      "greetItalic": false,
+      "greetBold": false,
+      "greetColor": "#2E4756",
+      "greetCenter": false,
+      "signColor": "#E7633C"
+    },
+    "juguetes": {
+      "image": "papel-juguetes.jpg",
+      "textBox": {
+        "x": 1.25,
+        "y": 1.5,
+        "w": 6,
+        "h": 7.375
+      },
+      "ink": "#4A4440",
+      "line": "#E2E2E8",
+      "greetFont": "Nunito",
+      "greetItalic": false,
+      "greetBold": true,
+      "greetColor": "#5E5852",
+      "greetCenter": true,
+      "signColor": "#E07272"
+    }
+  },
+  "santa": {
+    "image": "santa.jpg",
+    "addressZone": {
+      "x": 0,
+      "y": 0,
+      "w": 4.25,
+      "h": 2.95
+    },
+    "date": {
+      "x": 5.1,
+      "y": 2.12,
+      "w": 3.125,
+      "color": "#6B5016"
+    },
+    "textBox": {
+      "x": 1,
+      "y": 3.125,
+      "w": 6.5,
+      "h": 6.9
+    }
+  }
+}

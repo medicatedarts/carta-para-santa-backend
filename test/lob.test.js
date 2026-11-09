@@ -64,14 +64,18 @@ test('URL de impresión: firma válida, alterada y vencida', () => {
   assert.strictEqual(printUrl.verify(u.pathname, '1000', u.searchParams.get('sig')), false);
 });
 
-test('el HTML de impresión es grande: por eso va por URL y no directo', () => {
+test('el HTML de impresión usa fondos JPG, fuentes TTF y dos páginas carta', () => {
+  // El renderizador de Lob es un WebKit viejo: nada de woff2 ni flexbox; fondos como imagen.
   const { buildPrintHtml } = require('../printTemplate');
   const { sampleOrder } = require('../samples');
+  process.env.BACKEND_PUBLIC_URL = 'https://api.cartaparasanta.com';
   for (const d of ['clasica', 'taller', 'estrellas', 'polonorte', 'juguetes']) {
     const html = buildPrintHtml(sampleOrder(d, 'larga'));
-    assert.ok(html.length > 10000);
-    assert.match(html, /class="page santa"/);
-    assert.match(html, /class="page child"/);
+    assert.strictEqual((html.match(/class="page"/g) || []).length, 2);
+    assert.match(html, /\/fondos\/santa\.jpg/);
+    assert.ok(html.includes(`/fondos/papel-${d}.jpg`));
+    assert.match(html, /\.ttf/);
+    assert.doesNotMatch(html, /woff2|display:\s*flex/);
     assert.doesNotMatch(html, /Lob imprime aquí/);
   }
 });

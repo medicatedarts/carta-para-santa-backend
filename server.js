@@ -41,6 +41,8 @@ app.use(cors({ origin: origins }));
 
 // Fuentes para la impresión (Lob las descarga desde aquí si están en fonts/).
 app.use('/fonts', express.static(path.join(__dirname, 'fonts'), { maxAge: '30d' }));
+// Fondos de las cartas (imágenes a 300 ppp que Lob descarga al imprimir).
+app.use('/fondos', express.static(path.join(__dirname, 'papeles', 'fondos'), { maxAge: '1d' }));
 
 // ---------------------------------------------------------------------------
 // HTML de impresión para Lob (URL firmada y con vencimiento, ver printUrl.js).
