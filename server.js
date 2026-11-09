@@ -15,6 +15,7 @@ const Stripe = require('stripe');
 const db = require('./db');
 const { validateCheckout } = require('./validate');
 const { checkContent } = require('./contentFilter');
+const { checkAddress } = require('./addressVerify');
 const { buildPrintHtml } = require('./printTemplate');
 const printUrl = require('./printUrl');
 const { sampleOrder } = require('./samples');
@@ -192,6 +193,12 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
     const content = checkContent(data.letter);
     if (content.action === 'block') {
       return res.status(400).json({ error: content.reason, code: 'content_policy' });
+    }
+
+    // Dirección: se verifica con USPS (vía Lob) antes de cobrar.
+    const address = await checkAddress(data.shipTo);
+    if (!address.ok) {
+      return res.status(400).json({ error: address.message, code: address.code, field: 'shipTo' });
     }
 
     const order = await db.createOrder({

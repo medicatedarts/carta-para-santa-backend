@@ -101,7 +101,7 @@ Lo lee la landing y la compra.
 
 Respuesta: `{ "checkoutUrl": "https://checkout.stripe.com/…", "orderId": "…", "orderNumber": "PN-48213" }`.
 
-Errores `400` con `{ "error": "<mensaje para mostrar>", "code": "<código>" }`: `validation`, `content_policy`, `consent_required`, `mailbox_closed`, `address_unsupported`.
+Errores `400` con `{ "error": "<mensaje para mostrar>", "code": "<código>" }`: `validation`, `content_policy`, `consent_required`, `mailbox_closed`, `address_unsupported`, `address_undeliverable`, `address_deliverable_missing_unit`, `address_deliverable_incorrect_unit`.
 
 Pasos:
 
@@ -109,6 +109,7 @@ Pasos:
 2. Validar (§5) y normalizar (recortar espacios, quitar regalos vacíos).
 3. Consentimiento: los tres en `true`, si no → `400 consent_required`.
 4. Filtro de contenido (§6): `block` → `400 content_policy`; `review` → la orden se guarda con `review_reason` y se marcará `needs_review` al pagar.
+4b. Dirección verificada con Lob US Verifications (`addressVerify.js`, solo con clave live en modo `auto`): `undeliverable`, `deliverable_missing_unit` o `deliverable_incorrect_unit` → `400` con `code` `address_…` y `field: 'shipTo'`. Si Lob falla, la compra sigue.
 5. Insertar la orden `pending_payment`.
 6. Stripe Checkout: `mode: 'payment'`, `customer_email: buyer.email`, `metadata.orderId`, `payment_intent_data.metadata.orderId`, producto "Carta de respuesta de Santa — impresa y enviada por correo", `success_url = FRONTEND_URL/gracias.html?order=<id>`, `cancel_url = FRONTEND_URL/enviar.html?cancelado=1`.
 
