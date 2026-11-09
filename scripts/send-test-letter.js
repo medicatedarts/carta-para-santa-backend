@@ -13,7 +13,7 @@
 //   Formato de --to: "Nombre|Línea 1|Línea 2|Ciudad|Estado|Código postal" (Línea 2 puede ir vacía)
 //
 // Opciones:
-//   --design <id>   clasica | taller | estrellas | polonorte | juguetes | todos  (por defecto: clasica)
+//   --design <id>   clasica | taller | estrellas | polonorte | juguetes | duendes | dulces | cascanueces | todos  (por defecto: clasica)
 //   --to "<...>"    dirección del destinatario (obligatoria salvo con --dry)
 //   --larga         usa la carta de ejemplo al máximo (700 caracteres y 12 regalos)
 //   --dry           no llama a Lob: guarda el HTML en previews/ para abrirlo en el navegador

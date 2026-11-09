@@ -2,7 +2,7 @@
 // Límites y normalización de la carta (ESPECIFICACION §5). Deben coincidir con
 // los del frontend: con estos tamaños cada carta cabe en una página impresa.
 
-const DESIGNS = ['clasica', 'taller', 'estrellas', 'polonorte', 'juguetes'];
+const DESIGNS = ['clasica', 'taller', 'estrellas', 'polonorte', 'juguetes', 'duendes', 'dulces', 'cascanueces'];
 
 const LIMITS = {
   greeting: 40,

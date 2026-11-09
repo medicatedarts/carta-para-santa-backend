@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS orders (
                                              'in_transit','delivered','error','cancelled','refunded')),
 
   -- Carta
-  design                 text NOT NULL CHECK (design IN ('clasica','taller','estrellas','polonorte','juguetes')),
+  design                 text NOT NULL, -- la lista válida está en validate.js (DESIGNS)
   greeting               text,
   child_name             text,
   child_age              smallint CHECK (child_age IS NULL OR child_age BETWEEN 1 AND 17),
@@ -73,3 +73,6 @@ INSERT INTO settings (key, value) VALUES
   ('deadline_recommended', '"2026-12-10"'),
   ('mailbox_close_date',   '"2026-12-14"')
 ON CONFLICT (key) DO NOTHING;
+
+-- Bases creadas antes del 9 nov 2026 tenían un CHECK con solo 5 diseños.
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_design_check;

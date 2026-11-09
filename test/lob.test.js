@@ -69,7 +69,7 @@ test('el HTML de impresión usa fondos JPG, fuentes TTF y dos páginas carta', (
   const { buildPrintHtml } = require('../printTemplate');
   const { sampleOrder } = require('../samples');
   process.env.BACKEND_PUBLIC_URL = 'https://api.cartaparasanta.com';
-  for (const d of ['clasica', 'taller', 'estrellas', 'polonorte', 'juguetes']) {
+  for (const d of require('../validate').DESIGNS) {
     const html = buildPrintHtml(sampleOrder(d, 'larga'));
     assert.strictEqual((html.match(/class="page"/g) || []).length, 2);
     assert.match(html, /\/fondos\/santa\.jpg/);

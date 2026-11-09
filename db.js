@@ -176,7 +176,13 @@ async function setSettings(patch) {
   return getSettings();
 }
 
+// Ajustes de esquema que deben existir antes de recibir órdenes. Son idempotentes y corren
+// al arrancar, para no depender de que alguien corra scripts/db-init.js tras cada cambio.
+async function ensureSchema() {
+  await query('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_design_check');
+}
+
 module.exports = {
-  pool, query, createOrder, getOrder, getOrderByLobId, updateOrder, claimForLob, markPaid,
+  ensureSchema, pool, query, createOrder, getOrder, getOrderByLobId, updateOrder, claimForLob, markPaid,
   listOrders, stats, deleteOrder, getSettings, setSettings,
 };

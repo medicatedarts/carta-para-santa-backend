@@ -392,10 +392,14 @@ app.use((err, _req, res, _next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`🎅 CartaParaSanta backend en el puerto ${PORT}`);
-    startJobs();
-  });
+  db.ensureSchema()
+    .catch((err) => console.error('No se pudo ajustar el esquema:', err.message))
+    .finally(() => {
+      app.listen(PORT, () => {
+        console.log(`🎅 CartaParaSanta backend en el puerto ${PORT}`);
+        startJobs();
+      });
+    });
 }
 
 module.exports = app;

@@ -89,6 +89,57 @@
       "greetColor": "#5E5852",
       "greetCenter": true,
       "signColor": "#E07272"
+    },
+    "duendes": {
+      "image": "papel-duendes.jpg",
+      "textBox": {
+        "x": 2.05,
+        "y": 2.5,
+        "w": 4.25,
+        "h": 6.0
+      },
+      "ink": "#3A2E22",
+      "line": "#E3C9A0",
+      "greetFont": "Patrick Hand",
+      "greetColor": "#2F6B3A",
+      "signColor": "#C8302B",
+      "greetItalic": false,
+      "greetBold": false,
+      "greetCenter": false
+    },
+    "dulces": {
+      "image": "papel-dulces.jpg",
+      "textBox": {
+        "x": 1.9,
+        "y": 2.6,
+        "w": 4.9,
+        "h": 5.9
+      },
+      "ink": "#4A3226",
+      "line": "#E6CFAE",
+      "greetFont": "Pinyon Script",
+      "greetColor": "#8E3B1F",
+      "signColor": "#B3261E",
+      "greetItalic": false,
+      "greetBold": false,
+      "greetCenter": false
+    },
+    "cascanueces": {
+      "image": "papel-cascanueces.jpg",
+      "textBox": {
+        "x": 2.2,
+        "y": 2.15,
+        "w": 4.6,
+        "h": 6.5
+      },
+      "ink": "#2B2A3A",
+      "line": "#E5D3B3",
+      "greetFont": "Fraunces",
+      "greetColor": "#A3201B",
+      "signColor": "#1F4E8C",
+      "greetItalic": true,
+      "greetBold": true,
+      "greetCenter": false
     }
   },
   "santa": {

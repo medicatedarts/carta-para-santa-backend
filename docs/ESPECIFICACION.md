@@ -39,7 +39,7 @@ Ver `sql/schema.sql`. Resumen de `orders`:
 | `id` | uuid | Se usa también como `Idempotency-Key` en Lob |
 | `order_number` | text único | Formato `PN-` + 5 dígitos (PN = Polo Norte). Es lo que ve el cliente |
 | `status` | text | Ver §3 |
-| `design` | text | `clasica` · `taller` · `estrellas` · `polonorte` · `juguetes` |
+| `design` | text | `clasica` · `taller` · `estrellas` · `polonorte` · `juguetes` · `duendes` · `dulces` · `cascanueces` (lista en `validate.js`) |
 | `greeting`, `child_name`, `child_age`, `message`, `gifts` (jsonb), `farewell`, `signature` | | Contenido de la carta |
 | `buyer_name`, `buyer_email` | | Adulto responsable |
 | `ship_name`, `ship_line1`, `ship_line2`, `ship_city`, `ship_state`, `ship_zip`, `ship_country` | | Destinatario del sobre |

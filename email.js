@@ -11,6 +11,9 @@ const DESIGN_NAMES = {
   estrellas: 'Noche de estrellas',
   polonorte: 'Cielo del Polo Norte',
   juguetes: 'Juguetes en acuarela',
+  duendes: 'Duendes y renos',
+  dulces: 'Dulces navideños',
+  cascanueces: 'El cascanueces',
 };
 
 async function send({ to, subject, html }) {
