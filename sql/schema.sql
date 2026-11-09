@@ -76,3 +76,4 @@ ON CONFLICT (key) DO NOTHING;
 
 -- Bases creadas antes del 9 nov 2026 tenían un CHECK con solo 5 diseños.
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_design_check;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code text;

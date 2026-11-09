@@ -13,6 +13,7 @@ const cors = require('cors');
 const Stripe = require('stripe');
 
 const db = require('./db');
+const { checkPromo } = require('./promo');
 const { validateCheckout } = require('./validate');
 const { checkContent } = require('./contentFilter');
 const { checkAddress } = require('./addressVerify');
@@ -176,6 +177,23 @@ app.get('/api/config', async (_req, res) => {
   }
 });
 
+// Revisa un código de descuento antes de pagar (para mostrar el total nuevo en enviar.html).
+app.post('/api/promo', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
+  try {
+    const settings = await db.getSettings();
+    const email = String((req.body && req.body.email) || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      return res.status(400).json({ error: 'Escribe primero el correo del adulto.', code: 'promo_email' });
+    }
+    const r = await checkPromo(stripe, req.body.code, email, settings.priceCents);
+    if (!r.ok) return res.status(400).json({ error: r.message, code: r.code });
+    res.json({ code: r.code, priceCents: settings.priceCents, finalCents: r.finalCents });
+  } catch (err) {
+    console.error('Error en /api/promo:', err.message);
+    res.status(500).json({ error: 'No pudimos revisar el código.' });
+  }
+});
+
 app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
   try {
     const settings = await db.getSettings();
@@ -198,6 +216,13 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
       return res.status(400).json({ error: content.reason, code: 'content_policy' });
     }
 
+    // Código de descuento (opcional): se valida aquí, con el límite por correo.
+    let promo = null;
+    if (req.body.promoCode) {
+      promo = await checkPromo(stripe, req.body.promoCode, data.buyer.email, settings.priceCents);
+      if (!promo.ok) return res.status(400).json({ error: promo.message, code: promo.code, field: 'promo' });
+    }
+
     // Dirección: se verifica con USPS (vía Lob) antes de cobrar.
     const address = await checkAddress(data.shipTo);
     if (!address.ok) {
@@ -211,14 +236,15 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
       consentIp: req.ip || null,
       ship: data.shipTo,
       reviewReason: content.action === 'review' ? content.reason : null,
-      amountCents: settings.priceCents,
+      amountCents: promo ? promo.finalCents : settings.priceCents,
     });
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
-      // Los códigos (p. ej. el de 100% para familiares) se crean en Stripe → Product catalog → Coupons.
-      allow_promotion_codes: true,
+      // El código se aplica desde nuestro formulario (promo.js), no en la página de Stripe,
+      // para poder limitar los usos por correo.
+      ...(promo ? { discounts: [{ promotion_code: promo.promotionCodeId }] } : {}),
       customer_email: data.buyer.email,
       line_items: [{
         price_data: {
@@ -237,7 +263,7 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
       cancel_url: `${FRONTEND_URL}/enviar.html?cancelado=1`,
     });
 
-    await db.updateOrder(order.id, { stripe_session_id: session.id });
+    await db.updateOrder(order.id, { stripe_session_id: session.id, promo_code: promo ? promo.code : null });
     console.log(`🧾 Orden ${order.order_number} creada${order.review_reason ? ' (irá a revisión)' : ''}`);
     res.json({ checkoutUrl: session.url, orderId: order.id, orderNumber: order.order_number });
   } catch (err) {

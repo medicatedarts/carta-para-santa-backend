@@ -66,7 +66,7 @@ async function getOrderByLobId(lobLetterId) {
 
 // Actualiza solo las columnas permitidas (evita que un nombre de campo llegue a SQL sin control).
 const UPDATABLE = new Set([
-  'status', 'stripe_session_id', 'stripe_payment_intent', 'amount_cents', 'paid_at', 'review_reason',
+  'status', 'promo_code', 'stripe_session_id', 'stripe_payment_intent', 'amount_cents', 'paid_at', 'review_reason',
   'lob_letter_id', 'lob_expected_delivery', 'lob_price', 'lob_attempts', 'error',
   'sent_to_lob_at', 'mailed_at', 'delivered_at',
   'ship_name', 'ship_line1', 'ship_line2', 'ship_city', 'ship_state', 'ship_zip',
@@ -180,9 +180,24 @@ async function setSettings(patch) {
 // al arrancar, para no depender de que alguien corra scripts/db-init.js tras cada cambio.
 async function ensureSchema() {
   await query('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_design_check');
+  await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code text');
+}
+
+// Veces que un correo ha usado un código. Cuentan las órdenes pagadas o en curso; las
+// canceladas/reembolsadas no, y las que quedaron sin pagar solo durante un día (por si
+// abren varias páginas de pago a la vez).
+async function countPromoUses(email, code) {
+  const { rows } = await query(
+    `SELECT count(*)::int AS n FROM orders
+      WHERE lower(buyer_email) = lower($1) AND upper(promo_code) = upper($2)
+        AND status NOT IN ('cancelled', 'refunded')
+        AND (status <> 'pending_payment' OR created_at > now() - interval '1 day')`,
+    [String(email || '').trim(), code]
+  );
+  return rows[0].n;
 }
 
 module.exports = {
-  ensureSchema, pool, query, createOrder, getOrder, getOrderByLobId, updateOrder, claimForLob, markPaid,
+  ensureSchema, countPromoUses, pool, query, createOrder, getOrder, getOrderByLobId, updateOrder, claimForLob, markPaid,
   listOrders, stats, deleteOrder, getSettings, setSettings,
 };
