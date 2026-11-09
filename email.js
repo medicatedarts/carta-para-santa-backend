@@ -41,7 +41,8 @@ async function send({ to, subject, html }) {
   }
 }
 
-function layout(title, bodyHtml) {
+// footer: texto al pie. Las alertas internas usan uno propio (no son de un pedido del cliente).
+function layout(title, bodyHtml, footer = 'Recibes este correo porque hiciste un pedido en CartaParaSanta.com. Para pedir que borremos los datos de tu pedido, responde a este correo.') {
   return `<!doctype html><html lang="es"><body style="margin:0;background:#FBF7EF;font-family:Arial,Helvetica,sans-serif;color:#1F2A24">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #EADFC8;border-radius:16px">
@@ -50,7 +51,7 @@ function layout(title, bodyHtml) {
 <h1 style="margin:0 0 14px;font-family:Georgia,serif;font-size:24px;color:#0F3324">${title}</h1>
 ${bodyHtml}
 </td></tr>
-<tr><td style="padding:16px 28px 24px;font-size:12px;color:#5A645F;border-top:1px solid #EADFC8">Recibes este correo porque hiciste un pedido en CartaParaSanta.com. Para pedir que borremos los datos de tu pedido, responde a este correo.</td></tr>
+<tr><td style="padding:16px 28px 24px;font-size:12px;color:#5A645F;border-top:1px solid #EADFC8">${footer}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -110,7 +111,7 @@ function alert(subject, order, detail = '') {
   return send({
     to,
     subject: `[CartaParaSanta] ${subject}${order ? ' · ' + order.order_number : ''}`,
-    html: layout(esc(subject), `<p style="font-size:15px">Orden: <strong>${order ? esc(order.order_number) : '—'}</strong> (${order ? esc(order.status) : ''})</p><p style="font-size:14px;color:#5A645F">${esc(detail)}</p><p style="font-size:14px">Revísala en el panel administrativo.</p>`),
+    html: layout(esc(subject), `<p style="font-size:15px">Orden: <strong>${order ? esc(order.order_number) : '—'}</strong> (${order ? esc(order.status) : ''})</p><p style="font-size:14px;color:#5A645F">${esc(detail)}</p><p style="font-size:14px">Revísala en el <a href="${(process.env.FRONTEND_URL || 'https://www.cartaparasanta.com')}/admin.html" style="color:#B3261E">panel administrativo</a>.</p>`, 'Alerta interna del sistema de CartaParaSanta.com.'),
   });
 }
 
