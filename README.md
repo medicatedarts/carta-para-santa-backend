@@ -82,7 +82,7 @@ stripe listen --forward-to localhost:4000/api/webhook/stripe
 3. Variables de entorno: copiar todas las de `.env.example`.
 4. Dominio personalizado: `api.cartaparasanta.com`.
 5. Stripe → Developers → Webhooks → `https://api.cartaparasanta.com/api/webhook/stripe` con el evento `checkout.session.completed`.
-6. Lob → Webhooks → `https://api.cartaparasanta.com/api/webhook/lob` con `letter.mailed`, `letter.in_transit`, `letter.in_local_area`, `letter.processed_for_delivery`, `letter.re-routed`, `letter.returned_to_sender`.
+6. Lob → Webhooks, **en el entorno Live** (los eventos de seguimiento no existen en Test) → `https://api.cartaparasanta.com/api/webhook/lob` con `letter.in_transit`, `letter.in_local_area`, `letter.processed_for_delivery`, `letter.re-routed`, `letter.returned_to_sender` y, si tu plan lo permite, `letter.mailed` (es exclusivo de Enterprise; el backend da la carta por enviada con el primer evento que llegue).
 7. Pasar `LOB_API_KEY` y `STRIPE_SECRET_KEY` a las claves **live** solo después de las pruebas.
 
 ## Llaves

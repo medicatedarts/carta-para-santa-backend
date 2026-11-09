@@ -96,13 +96,18 @@ app.post('/api/webhook/lob', express.raw({ type: 'application/json' }), async (r
     const rank = { sent_to_lob: 1, mailed: 2, in_transit: 3, delivered: 4 };
     if (status !== 'error' && (rank[order.status] || 0) >= rank[status]) return;
 
+    // El evento "Mailed" de Lob es exclusivo del plan Enterprise: en los demás planes
+    // el primer aviso que llega es el de USPS (in_transit / in_local_area). Por eso la
+    // carta se da por "salida" con el primer evento de seguimiento que llegue, sea cual sea.
+    const firstTracking = status !== 'error' && (rank[order.status] || 0) < rank.mailed;
+
     const patch = { status };
-    if (status === 'mailed') patch.mailed_at = new Date();
+    if (firstTracking) patch.mailed_at = new Date();
     if (status === 'delivered') patch.delivered_at = new Date();
     if (status === 'error') patch.error = 'USPS devolvió la carta al remitente';
     const updated = await db.updateOrder(order.id, patch);
 
-    if (status === 'mailed') await email.orderMailed(updated);
+    if (firstTracking) await email.orderMailed(updated);
     if (status === 'error') await email.alert('USPS devolvió una carta', updated, 'Revisa la dirección y reenvía.');
   } catch (err) {
     console.error('Error procesando webhook de Lob:', err.message);
