@@ -82,9 +82,9 @@ function introLine(order) {
   return '';
 }
 
-// Renglones que ocupa un texto con Patrick Hand (≈0.44 em de ancho medio por carácter).
+// Renglones que ocupa un texto con Patrick Hand (≈0.41 em de ancho medio por carácter).
 function lines(text, widthIn, fontPt) {
-  const perLine = Math.max(8, Math.floor((widthIn * 72) / (fontPt * 0.44)));
+  const perLine = Math.max(8, Math.floor((widthIn * 72) / (fontPt * 0.41)));
   return String(text || '')
     .split('\n')
     .reduce((n, para) => n + Math.max(1, Math.ceil(para.length / perLine)), 0);
@@ -94,12 +94,21 @@ function lines(text, widthIn, fontPt) {
  * Tamaño de letra (pt) y alto de renglón (pulgadas) para que la carta quepa en la caja.
  * Base: 23.5 pt con renglones de 0.5" (lo mismo que se ve en el prototipo).
  */
+// El saludo ("Querido Santa Claus:") es el titular: más grande que el cuerpo y con su propio
+// espacio de varios renglones, apoyado sobre una línea del papel.
+function titleMetrics(pt, lhPx, d) {
+  const script = d.greetFont === 'Pinyon Script';
+  const titlePt = r3(Math.min(40, Math.max(28, pt * 1.8)) * (script ? 1.35 : 1));
+  const needPx = (titlePt * 96) / 72 * 1.6; // con aire para que no choque con el primer renglón
+  return { titlePt, rows: Math.max(2, Math.ceil(needPx / lhPx)) };
+}
+
 function fitText(order, d) {
   const { w, h } = d.textBox;
   const gifts = Array.isArray(order.gifts) ? order.gifts : [];
   const intro = introLine(order);
   const units = (pt) => {
-    let u = 2; // saludo = 2 renglones
+    let u = titleMetrics(pt, Math.round(pt * (0.5 / 23.5) * 96), d).rows; // titular
     if (intro) u += lines(intro, w, pt);
     if (order.message) u += lines(order.message, w, pt);
     if (gifts.length) u += 1 + gifts.reduce((n, g) => n + lines(g, w - 0.35, pt), 0);
@@ -137,14 +146,18 @@ function childPage(order, a) {
   // Renglones del papel: divs de 1 px en la base de cada renglón de texto.
   const ruled = [];
   const n = Math.floor(height / lhPx);
-  for (let i = 1; i <= n; i++) {
+  const title = titleMetrics(pt, lhPx, d);
+  for (let i = title.rows + 1; i <= n; i++) { // el titular no lleva línea debajo
     ruled.push(`<div class="rule" style="left:${left}px;top:${top + i * lhPx - 1}px;width:${width}px;background:${d.line}"></div>`);
   }
 
+  const titlePx = Math.round((title.titlePt * 96) / 72);
   const greetStyle = [
+    'position:absolute;left:0;right:0;margin:0',
+    `bottom:${Math.round(Math.max(lhPx * 0.3, titlePx * 0.5) - titlePx * (d.greetFont === 'Pinyon Script' ? 0.3 : 0.22))}px`,
     `font-family:'${d.greetFont}'`,
-    `font-size:${r3(pt * (d.greetFont === 'Pinyon Script' ? 1.45 : 1.3))}pt`,
-    `line-height:${lhPx * 2}px`,
+    `font-size:${title.titlePt}pt`,
+    'line-height:1',
     `color:${d.greetColor}`,
     d.greetItalic ? 'font-style:italic' : '',
     d.greetBold ? 'font-weight:700' : '',
@@ -153,7 +166,7 @@ function childPage(order, a) {
 
   const p = (txt, extra = '') => `<p style="margin:0;line-height:${lhPx}px;${extra}">${txt}</p>`;
   const body = [
-    `<p style="margin:0;${greetStyle}">${esc(order.greeting || 'Querido Santa:')}</p>`,
+    `<div style="position:relative;height:${title.rows * lhPx}px"><p style="${greetStyle}">${esc(order.greeting || 'Querido Santa:')}</p></div>`,
     intro ? p(esc(intro)) : '',
     order.message ? p(esc(order.message), 'white-space:pre-wrap') : '',
     gifts.length ? p('Esta es mi lista de regalos:') : '',
