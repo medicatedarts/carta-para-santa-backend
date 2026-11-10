@@ -10,6 +10,7 @@ require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const Stripe = require('stripe');
 
 const db = require('./db');
@@ -36,6 +37,20 @@ for (const key of ['DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET',
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
 const app = express();
 app.set('trust proxy', 1); // Render pone un proxy delante: así req.ip es la IP real
+app.disable('x-powered-by');
+
+// Cabeceras de seguridad básicas (sin dependencias). La API no se muestra en iframes ajenos
+// ni la página de impresión, y los navegadores no deben adivinar tipos de contenido.
+app.use((_req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'Cross-Origin-Resource-Policy': 'cross-origin', // fondos y fuentes los carga Lob y el panel
+  });
+  next();
+});
 
 const origins = (process.env.CORS_ORIGINS || FRONTEND_URL).split(',').map((s) => s.trim()).filter(Boolean);
 app.use(cors({ origin: origins }));
@@ -160,7 +175,10 @@ function rateLimit(max, windowMs) {
     next();
   };
 }
-setInterval(() => { const now = Date.now(); for (const [k, v] of hits) if (!v.some((t) => now - t < 3600e3)) hits.delete(k); }, 3600e3).unref();
+setInterval(() => {
+  const now = Date.now();
+  for (const m of [hits, adminFails]) for (const [k, v] of m) if (!v.some((t) => now - t < 3600e3)) m.delete(k);
+}, 3600e3).unref();
 
 // ---------------------------------------------------------------------------
 // API pública
@@ -275,6 +293,9 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
 // Estado para la página de gracias. Sin datos personales.
 app.get('/api/order/:id', async (req, res) => {
   try {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
     const order = await db.getOrder(req.params.id);
     if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
     // needs_review / error / sent_to_lob se muestran al cliente como "en preparación".
@@ -292,11 +313,27 @@ app.get('/api/order/:id', async (req, res) => {
 // ---------------------------------------------------------------------------
 // Administración (header x-admin-token). La usa admin.html del frontend.
 // ---------------------------------------------------------------------------
+// Intentos fallidos por IP: con 10 en 15 minutos se bloquea esa IP un rato (frena a quien
+// intente adivinar el token). La comparación es de tiempo constante.
+const adminFails = new Map();
+function tokenMatches(given) {
+  const real = process.env.ADMIN_TOKEN;
+  if (!real || typeof given !== 'string') return false;
+  const a = crypto.createHash('sha256').update(given).digest();
+  const b = crypto.createHash('sha256').update(real).digest();
+  return crypto.timingSafeEqual(a, b);
+}
 function requireAdmin(req, res, next) {
-  const token = req.headers['x-admin-token'];
-  if (!process.env.ADMIN_TOKEN || token !== process.env.ADMIN_TOKEN) {
+  const now = Date.now();
+  const fails = (adminFails.get(req.ip) || []).filter((t) => now - t < 15 * 60 * 1000);
+  if (fails.length >= 10) return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
+  if (!tokenMatches(req.headers['x-admin-token'])) {
+    fails.push(now);
+    adminFails.set(req.ip, fails);
     return res.status(401).json({ error: 'No autorizado.' });
   }
+  adminFails.delete(req.ip);
+  res.set('Cache-Control', 'private, no-store');
   next();
 }
 const admin = express.Router();
