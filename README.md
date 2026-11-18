@@ -96,5 +96,6 @@ stripe listen --forward-to localhost:4000/api/webhook/stripe
 | `DATABASE_URL` | Render → Postgres → Internal Database URL |
 | `RESEND_API_KEY` (o el proveedor que escojas) | Proveedor de correo transaccional + registros SPF/DKIM en el DNS |
 | `ADMIN_TOKEN` | Cadena larga y aleatoria que tú inventas |
+| `META_PIXEL_ID`, `META_CAPI_TOKEN` | Meta Events Manager → conjunto de datos → API de Conversiones (ver `metaCapi.js`). `META_TEST_EVENT_CODE` solo mientras pruebas |
 
 Plan de lanzamiento: https://claude.ai/artifact/2n5macLYHsB344UeenFmp4

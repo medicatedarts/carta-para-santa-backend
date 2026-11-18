@@ -26,6 +26,7 @@ const lob = require('./lob');
 const email = require('./email');
 const { sendToLob, afterPaid } = require('./fulfill');
 const { startJobs } = require('./jobs');
+const metaCapi = require('./metaCapi');
 
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5500').replace(/\/$/, '');
@@ -112,7 +113,25 @@ app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), async
         amountCents: session.amount_total,
       });
       // null = ya estaba pagada (webhook repetido) o no existe: no se hace nada más.
-      if (order) await afterPaid(order);
+      if (!order) return;
+      // Conversión para Meta (solo datos del adulto; ver metaCapi.js). Sin await: nunca
+      // debe atrasar ni romper el envío de la carta. Las órdenes gratis no cuentan como venta.
+      if (session.amount_total > 0) {
+        const md = session.metadata || {};
+        metaCapi.sendEvent({
+          eventName: 'Purchase',
+          eventId: order.id, // el mismo id descarta duplicados si Stripe repite el webhook
+          email: (session.customer_details && session.customer_details.email) || order.buyer_email,
+          fbc: md.fbc,
+          ip: md.ip,
+          userAgent: md.ua,
+          valueCents: session.amount_total,
+          currency: session.currency,
+          sourceUrl: `${FRONTEND_URL}/gracias.html`,
+          label: order.order_number,
+        });
+      }
+      await afterPaid(order);
     } catch (err) {
       console.error(`Error procesando el pago de ${orderId}:`, err.message);
     }
@@ -257,6 +276,18 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
       amountCents: promo ? promo.finalCents : settings.priceCents,
     });
 
+    // Para Meta (metaCapi.js): el identificador del clic del anuncio, si lo hay, y el
+    // navegador e IP del adulto. Viajan en la metadata de Stripe para usarlos cuando
+    // llegue el webhook del pago. Nada de esto es del niño.
+    const attribution = {
+      fbc: metaCapi.cleanFbc(req.body.attribution && req.body.attribution.fbc),
+      ua: (req.get('user-agent') || '').slice(0, 400),
+      ip: req.ip || '',
+    };
+    const metaMetadata = metaCapi.enabled()
+      ? Object.fromEntries(Object.entries(attribution).filter(([, v]) => v))
+      : {};
+
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
@@ -275,7 +306,7 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
         },
         quantity: 1,
       }],
-      metadata: { orderId: order.id, orderNumber: order.order_number },
+      metadata: { orderId: order.id, orderNumber: order.order_number, ...metaMetadata },
       payment_intent_data: { metadata: { orderId: order.id, orderNumber: order.order_number } },
       success_url: `${FRONTEND_URL}/gracias.html?order=${order.id}`,
       cancel_url: `${FRONTEND_URL}/enviar.html?cancelado=1`,
@@ -283,6 +314,20 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
 
     await db.updateOrder(order.id, { stripe_session_id: session.id, promo_code: promo ? promo.code : null });
     console.log(`🧾 Orden ${order.order_number} creada${order.review_reason ? ' (irá a revisión)' : ''}`);
+    if (order.amount_cents > 0) {
+      metaCapi.sendEvent({
+        eventName: 'InitiateCheckout',
+        eventId: `ic-${order.id}`,
+        email: data.buyer.email,
+        fbc: attribution.fbc,
+        ip: attribution.ip,
+        userAgent: attribution.ua,
+        valueCents: order.amount_cents,
+        currency: process.env.STRIPE_CURRENCY || 'usd',
+        sourceUrl: `${FRONTEND_URL}/enviar.html`,
+        label: order.order_number,
+      });
+    }
     res.json({ checkoutUrl: session.url, orderId: order.id, orderNumber: order.order_number });
   } catch (err) {
     console.error('Error creando el checkout:', err.message);
@@ -480,6 +525,11 @@ admin.get('/check', async (_req, res) => {
   }
   const wh = process.env.STRIPE_WEBHOOK_SECRET || '';
   add('Stripe', 'Secreto del webhook de Stripe', wh.startsWith('whsec_') ? 'ok' : 'error', wh ? 'configurado' : 'falta');
+
+  // --- Meta (Conversions API) ---
+  add('Meta', 'Conversiones de anuncios', metaCapi.enabled() ? 'ok' : 'warn',
+    metaCapi.enabled() ? `conjunto de datos ${process.env.META_PIXEL_ID}` : 'falta META_PIXEL_ID o META_CAPI_TOKEN: Meta no verá las ventas');
+  if (process.env.META_TEST_EVENT_CODE) add('Meta', 'Modo de prueba', 'warn', 'META_TEST_EVENT_CODE está puesto: bórralo cuando termines de probar');
 
   // --- Correo y URLs ---
   add('Correo', 'Resend', process.env.RESEND_API_KEY ? 'ok' : 'error', process.env.RESEND_API_KEY ? (process.env.EMAIL_FROM || 'remitente por defecto') : 'falta RESEND_API_KEY');
