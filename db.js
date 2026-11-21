@@ -97,6 +97,21 @@ async function claimForLob(id, fromStatuses = ['paid', 'error']) {
   return rows[0] || null;
 }
 
+// Órdenes que nunca se pagaron: la página de pago de Stripe vence a las 24 h, así que a las
+// 25 h ya no pueden pagarse. Se cancelan y se borra todo lo personal (carta, dirección y
+// datos del adulto): no se guarda nada de una compra que no se hizo (privacidad, COPPA).
+async function expireUnpaid() {
+  const { rowCount } = await query(
+    `UPDATE orders SET status = 'cancelled', error = 'Sin pagar en 24 horas: cancelada y borrada sola',
+        greeting = NULL, child_name = NULL, child_age = NULL, message = NULL, gifts = '[]'::jsonb,
+        farewell = NULL, signature = NULL, buyer_name = NULL, buyer_email = NULL, consent_ip = NULL,
+        ship_name = NULL, ship_line1 = NULL, ship_line2 = NULL, ship_city = NULL, ship_state = NULL,
+        ship_zip = NULL, review_reason = NULL, purged_at = now()
+      WHERE status = 'pending_payment' AND created_at < now() - interval '25 hours'`
+  );
+  return rowCount;
+}
+
 // Marca pagada solo si seguía pendiente (otro webhook repetido no la vuelve a procesar).
 async function markPaid(id, { sessionId, paymentIntent, amountCents }) {
   const { rows } = await query(
@@ -198,6 +213,6 @@ async function countPromoUses(email, code) {
 }
 
 module.exports = {
-  ensureSchema, countPromoUses, pool, query, createOrder, getOrder, getOrderByLobId, updateOrder, claimForLob, markPaid,
+  ensureSchema, countPromoUses, expireUnpaid, pool, query, createOrder, getOrder, getOrderByLobId, updateOrder, claimForLob, markPaid,
   listOrders, stats, deleteOrder, getSettings, setSettings,
 };

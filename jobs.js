@@ -5,6 +5,7 @@
 //  - Cada 10 min: retoma órdenes pagadas que no llegaron a Lob (el proceso murió a
 //    mitad del webhook) y reintenta las que fallaron por un error temporal de Lob.
 //  - Cada 10 min: avisa de órdenes pagadas que llevan más de 1 hora sin enviarse.
+//  - Cada 30 min: cancela y borra las órdenes que llevan 25 h sin pagarse.
 //  - Cada 6 h: borra el contenido de la carta y la dirección de las órdenes ya
 //    entregadas hace más de RETENTION_DAYS_AFTER_DELIVERY días (privacidad, COPPA).
 
@@ -58,6 +59,11 @@ async function purgeOld() {
   if (rowCount) console.log(`🧹 Borrado por retención: ${rowCount} órdenes`);
 }
 
+async function expireUnpaid() {
+  const n = await db.expireUnpaid();
+  if (n) console.log(`🧹 Órdenes sin pagar canceladas y borradas: ${n}`);
+}
+
 function safe(fn, name) {
   return () => fn().catch((err) => console.error(`Job ${name} falló:`, err.message));
 }
@@ -65,8 +71,10 @@ function safe(fn, name) {
 function startJobs() {
   setTimeout(safe(retryStuck, 'retryStuck'), 30 * 1000);
   setInterval(safe(retryStuck, 'retryStuck'), 10 * 60 * 1000);
+  setTimeout(safe(expireUnpaid, 'expireUnpaid'), 45 * 1000);
+  setInterval(safe(expireUnpaid, 'expireUnpaid'), 30 * 60 * 1000);
   setTimeout(safe(purgeOld, 'purgeOld'), 60 * 1000);
   setInterval(safe(purgeOld, 'purgeOld'), 6 * 60 * 60 * 1000);
 }
 
-module.exports = { startJobs, retryStuck, purgeOld };
+module.exports = { startJobs, retryStuck, purgeOld, expireUnpaid };

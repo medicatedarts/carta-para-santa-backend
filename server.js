@@ -113,7 +113,14 @@ app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), async
         amountCents: session.amount_total,
       });
       // null = ya estaba pagada (webhook repetido) o no existe: no se hace nada más.
-      if (!order) return;
+      // Excepción: si llega un pago de una orden que ya se canceló por no pagarse, se avisa.
+      if (!order) {
+        const prev = await db.getOrder(orderId);
+        if (prev && prev.status === 'cancelled') {
+          await email.alert('Llegó un pago de una orden ya cancelada (revisar en Stripe)', prev, `sesión ${session.id}`);
+        }
+        return;
+      }
       // Conversión para Meta (solo datos del adulto; ver metaCapi.js). Sin await: nunca
       // debe atrasar ni romper el envío de la carta. Las órdenes gratis no cuentan como venta.
       if (session.amount_total > 0) {
