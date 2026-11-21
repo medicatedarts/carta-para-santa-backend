@@ -15,7 +15,7 @@ const Stripe = require('stripe');
 
 const db = require('./db');
 const { checkPromo } = require('./promo');
-const { validateCheckout } = require('./validate');
+const { validateCheckout, maxLetters } = require('./validate');
 const { checkContent } = require('./contentFilter');
 const { checkAddress } = require('./addressVerify');
 const { buildPrintHtml } = require('./printTemplate');
@@ -24,7 +24,7 @@ const { sampleOrder } = require('./samples');
 const { DESIGNS } = require('./validate');
 const lob = require('./lob');
 const email = require('./email');
-const { sendToLob, afterPaid } = require('./fulfill');
+const { sendToLob, afterPaidGroup } = require('./fulfill');
 const { startJobs } = require('./jobs');
 const metaCapi = require('./metaCapi');
 const recordatorios = require('./recordatorios');
@@ -108,12 +108,14 @@ app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), async
 
   setImmediate(async () => {
     try {
-      const order = await db.markPaid(orderId, {
+      // Todas las cartas de la compra (combo de hermanitos) se marcan pagadas juntas.
+      const paid = await db.markPaidGroup(orderId, {
         sessionId: session.id,
         paymentIntent: session.payment_intent,
         amountCents: session.amount_total,
       });
-      // null = ya estaba pagada (webhook repetido) o no existe: no se hace nada más.
+      const order = paid[0];
+      // Vacío = ya estaban pagadas (webhook repetido) o no existen: no se hace nada más.
       // Excepción: si llega un pago de una orden que ya se canceló por no pagarse, se avisa.
       if (!order) {
         const prev = await db.getOrder(orderId);
@@ -139,7 +141,7 @@ app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), async
           label: order.order_number,
         });
       }
-      await afterPaid(order);
+      await afterPaidGroup(paid);
     } catch (err) {
       console.error(`Error procesando el pago de ${orderId}:`, err.message);
     }
@@ -215,7 +217,7 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('/api/config', async (_req, res) => {
   try {
     const s = await db.getSettings();
-    res.json({ ...s, currency: process.env.STRIPE_CURRENCY || 'usd', taxMode: process.env.TAX_MODE || 'included' });
+    res.json({ ...s, maxLetters: maxLetters(), currency: process.env.STRIPE_CURRENCY || 'usd', taxMode: process.env.TAX_MODE || 'included' });
   } catch (err) {
     console.error('Error leyendo la configuración:', err.message);
     res.status(500).json({ error: 'No se pudo leer la configuración.' });
@@ -230,18 +232,31 @@ app.post('/api/promo', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       return res.status(400).json({ error: 'Escribe primero el correo del adulto.', code: 'promo_email' });
     }
-    const r = await checkPromo(stripe, req.body.code, email, settings.priceCents);
+    const prices = letterPrices(settings, req.body.letters);
+    const r = await checkPromo(stripe, req.body.code, email, prices);
     if (!r.ok) return res.status(400).json({ error: r.message, code: r.code });
-    res.json({ code: r.code, priceCents: settings.priceCents, finalCents: r.finalCents });
+    res.json({ code: r.code, priceCents: prices.reduce((a, b) => a + b, 0), finalCents: r.finalCents });
   } catch (err) {
     console.error('Error en /api/promo:', err.message);
     res.status(500).json({ error: 'No pudimos revisar el código.' });
   }
 });
 
+// Precio de lista de cada carta de una compra: la primera al precio normal y las demás
+// (hermanitos) al precio de carta adicional. Nunca más caro que la primera.
+function letterPrices(settings, count) {
+  const n = Math.min(Math.max(parseInt(count, 10) || 1, 1), maxLetters());
+  const extra = Math.min(settings.extraPriceCents > 0 ? settings.extraPriceCents : settings.priceCents, settings.priceCents);
+  return Array.from({ length: n }, (_, i) => (i === 0 ? settings.priceCents : extra));
+}
+
 // Sesión de pago de Stripe para una orden ya creada. La usan el checkout y el enlace de
 // los recordatorios (/r/pagar), que abre una sesión nueva para la misma orden.
-function createStripeSession(order, { priceCents, promo = null, metaMetadata = {}, expiresAt } = {}) {
+// Recibe las órdenes de la compra (una por carta) y el precio de lista de cada una. La
+// primera orden es la principal: su id va en la metadata y en la página de gracias.
+function createStripeSession(orders, { prices, promo = null, metaMetadata = {}, expiresAt } = {}) {
+  const order = orders[0];
+  const many = orders.length > 1;
   return stripe.checkout.sessions.create({
     mode: 'payment',
     payment_method_types: ['card'],
@@ -250,20 +265,27 @@ function createStripeSession(order, { priceCents, promo = null, metaMetadata = {
     ...(promo ? { discounts: [{ promotion_code: promo.promotionCodeId }] } : {}),
     ...(expiresAt ? { expires_at: expiresAt } : {}),
     customer_email: order.buyer_email,
-    line_items: [{
+    // Una línea por carta, cada una con su precio de lista; si hay código, Stripe aplica el
+    // descuento encima del total.
+    line_items: orders.map((o, i) => ({
       price_data: {
         currency: process.env.STRIPE_CURRENCY || 'usd',
-        // Precio de lista; si hay código, Stripe aplica el descuento encima.
-        unit_amount: priceCents,
+        unit_amount: prices[i],
         product_data: {
-          name: 'Carta de respuesta de Santa — impresa y enviada por correo',
-          description: `Para: ${order.ship_name} · Orden ${order.order_number}`,
+          name: i === 0
+            ? 'Carta de respuesta de Santa — impresa y enviada por correo'
+            : 'Carta adicional para hermanito — impresa y enviada por correo',
+          description: `Para: ${o.ship_name} · Orden ${o.order_number}`,
         },
       },
       quantity: 1,
-    }],
-    metadata: { orderId: order.id, orderNumber: order.order_number, ...metaMetadata },
-    payment_intent_data: { metadata: { orderId: order.id, orderNumber: order.order_number } },
+    })),
+    metadata: {
+      orderId: order.id, orderNumber: order.order_number,
+      ...(many ? { letters: String(orders.length), orderNumbers: orders.map((o) => o.order_number).join(',') } : {}),
+      ...metaMetadata,
+    },
+    payment_intent_data: { metadata: { orderId: order.id, orderNumber: order.order_number, ...(many ? { letters: String(orders.length) } : {}) } },
     success_url: `${FRONTEND_URL}/gracias.html?order=${order.id}`,
     cancel_url: `${FRONTEND_URL}/enviar.html?cancelado=1`,
   });
@@ -281,11 +303,13 @@ app.get('/r/pagar/:id', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
   }
   const id = req.params.id;
   try {
-    const order = await db.getOrder(id);
-    if (!order || order.purged_at || order.status === 'cancelled' || order.status === 'refunded') {
+    // Toda la compra (combo de hermanitos): se paga junta, igual que la primera vez.
+    const group = await db.getGroup(id);
+    const order = group[0];
+    if (!order || order.id !== id || order.purged_at || order.status === 'cancelled' || order.status === 'refunded') {
       return res.redirect(303, `${FRONTEND_URL}/carta.html`);
     }
-    if (order.status !== 'pending_payment') return res.redirect(303, `${FRONTEND_URL}/gracias.html?order=${order.id}`);
+    if (group.some((o) => o.status !== 'pending_payment')) return res.redirect(303, `${FRONTEND_URL}/gracias.html?order=${order.id}`);
 
     if (order.stripe_session_id) {
       const prev = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
@@ -300,7 +324,8 @@ app.get('/r/pagar/:id', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
     if (purgeAt - now < 31 * 60) return res.redirect(303, `${FRONTEND_URL}/carta.html`);
     const expiresAt = Math.min(purgeAt, now + 23 * 3600);
 
-    const session = await createStripeSession(order, { priceCents: order.amount_cents, expiresAt });
+    // Los recordatorios nunca van a órdenes con código, así que el precio guardado es el de lista.
+    const session = await createStripeSession(group, { prices: group.map((o) => o.amount_cents), expiresAt });
     await db.updateOrder(order.id, { stripe_session_id: session.id });
     console.log(`💌 Orden ${order.order_number}: volvió desde el recordatorio`);
     res.redirect(303, session.url);
@@ -361,34 +386,44 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
     } catch (err) {
       return res.status(400).json({ error: err.message, code: err.code || 'validation' });
     }
+    const many = data.letters.length > 1;
 
-    const content = checkContent(data.letter);
-    if (content.action === 'block') {
-      return res.status(400).json({ error: content.reason, code: 'content_policy' });
+    // Filtro de contenido, carta por carta. Si una se bloquea, no se crea ninguna.
+    const contents = data.letters.map((l) => checkContent(l));
+    const blocked = contents.findIndex((c) => c.action === 'block');
+    if (blocked >= 0) {
+      return res.status(400).json({ error: (many ? `Carta ${blocked + 1}: ` : '') + contents[blocked].reason, code: 'content_policy', letter: blocked });
     }
 
-    // Código de descuento (opcional): se valida aquí, con el límite por correo.
+    // Precio de lista de cada carta: la primera normal y las demás al precio de hermanito.
+    const prices = letterPrices(settings, data.letters.length);
+
+    // Código de descuento (opcional): se valida aquí, con el límite por correo (cada carta cuenta).
     let promo = null;
     if (req.body.promoCode) {
-      promo = await checkPromo(stripe, req.body.promoCode, data.buyer.email, settings.priceCents);
+      promo = await checkPromo(stripe, req.body.promoCode, data.buyer.email, prices);
       if (!promo.ok) return res.status(400).json({ error: promo.message, code: promo.code, field: 'promo' });
     }
+    const amounts = promo ? promo.parts : prices;
 
-    // Dirección: se verifica con USPS (vía Lob) antes de cobrar.
+    // Dirección: se verifica con USPS (vía Lob) antes de cobrar. Es la misma para todas.
     const address = await checkAddress(data.shipTo);
     if (!address.ok) {
       return res.status(400).json({ error: address.message, code: address.code, field: 'shipTo' });
     }
 
-    const order = await db.createOrder({
-      ...data.letter,
+    // Una orden por carta, cada una con su nombre en el sobre y su parte del precio.
+    const orders = await db.createOrderGroup(data.letters.map((l, i) => ({
+      ...l,
       buyerName: data.buyer.name,
       buyerEmail: data.buyer.email,
       consentIp: req.ip || null,
-      ship: data.shipTo,
-      reviewReason: content.action === 'review' ? content.reason : null,
-      amountCents: promo ? promo.finalCents : settings.priceCents,
-    });
+      ship: { ...data.shipTo, name: l.shipName },
+      reviewReason: contents[i].action === 'review' ? contents[i].reason : null,
+      amountCents: amounts[i],
+    })));
+    const order = orders[0];
+    const totalCents = amounts.reduce((a, b) => a + b, 0);
 
     // Para Meta (metaCapi.js): el identificador del clic del anuncio, si lo hay, y el
     // navegador e IP del adulto. Viajan en la metadata de Stripe para usarlos cuando
@@ -402,11 +437,13 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
       ? Object.fromEntries(Object.entries(attribution).filter(([, v]) => v))
       : {};
 
-    const session = await createStripeSession(order, { priceCents: settings.priceCents, promo, metaMetadata });
+    const session = await createStripeSession(orders, { prices, promo, metaMetadata });
 
-    await db.updateOrder(order.id, { stripe_session_id: session.id, promo_code: promo ? promo.code : null });
-    console.log(`🧾 Orden ${order.order_number} creada${order.review_reason ? ' (irá a revisión)' : ''}`);
-    if (order.amount_cents > 0) {
+    for (const o of orders) {
+      await db.updateOrder(o.id, { stripe_session_id: session.id, promo_code: promo ? promo.code : null });
+    }
+    console.log(`🧾 Orden ${order.order_number} creada${many ? ` con ${orders.length} cartas` : ''}${orders.some((o) => o.review_reason) ? ' (irá a revisión)' : ''}`);
+    if (totalCents > 0) {
       metaCapi.sendEvent({
         eventName: 'InitiateCheckout',
         eventId: `ic-${order.id}`,
@@ -414,13 +451,13 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
         fbc: attribution.fbc,
         ip: attribution.ip,
         userAgent: attribution.ua,
-        valueCents: order.amount_cents,
+        valueCents: totalCents,
         currency: process.env.STRIPE_CURRENCY || 'usd',
         sourceUrl: `${FRONTEND_URL}/enviar.html`,
         label: order.order_number,
       });
     }
-    res.json({ checkoutUrl: session.url, orderId: order.id, orderNumber: order.order_number });
+    res.json({ checkoutUrl: session.url, orderId: order.id, orderNumber: order.order_number, orderNumbers: orders.map((o) => o.order_number) });
   } catch (err) {
     console.error('Error creando el checkout:', err.message);
     res.status(500).json({ error: 'No se pudo iniciar el pago. Intenta de nuevo en un momento.', code: 'server' });
@@ -433,15 +470,29 @@ app.get('/api/order/:id', async (req, res) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(req.params.id)) {
       return res.status(404).json({ error: 'Pedido no encontrado' });
     }
-    const order = await db.getOrder(req.params.id);
+    const group = await db.getGroup(req.params.id);
+    const order = group.find((o) => o.id === req.params.id);
     if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
     // needs_review / error / sent_to_lob se muestran al cliente como "en preparación".
-    const publicStatus = {
+    const toPublic = (st) => ({
       pending_payment: 'pending_payment', paid: 'preparing', needs_review: 'preparing', sent_to_lob: 'preparing',
       error: 'preparing', mailed: 'mailed', in_transit: 'mailed', delivered: 'delivered',
       cancelled: 'cancelled', refunded: 'refunded',
-    }[order.status];
-    res.json({ orderNumber: order.order_number, status: publicStatus, expectedDelivery: order.lob_expected_delivery });
+    }[st]);
+    // Combo de hermanitos: el estado general es el de la carta más atrasada (nunca se dice
+    // que "salió" si alguna todavía no sale). Las reembolsadas o canceladas no cuentan, salvo
+    // que lo estén todas.
+    const rank = { pending_payment: 0, preparing: 1, mailed: 2, delivered: 3 };
+    const live = group.map((o) => toPublic(o.status)).filter((st) => st in rank);
+    const status = live.length ? live.reduce((a, b) => (rank[b] < rank[a] ? b : a)) : toPublic(order.status);
+    const dates = group.map((o) => o.lob_expected_delivery).filter(Boolean).sort();
+    res.json({
+      orderNumber: order.order_number,
+      orderNumbers: group.map((o) => o.order_number),
+      letters: group.length,
+      status,
+      expectedDelivery: dates.length ? dates[dates.length - 1] : null,
+    });
   } catch (err) {
     res.status(500).json({ error: 'No se pudo consultar el pedido.' });
   }
@@ -547,7 +598,11 @@ admin.post('/orders/:id/refund', async (req, res) => {
     return res.status(409).json({ error: 'Esta orden no tiene un pago que reembolsar.' });
   }
   try {
-    await stripe.refunds.create({ payment_intent: order.stripe_payment_intent });
+    // En una compra con varias cartas se devuelve solo la parte de esta carta.
+    const group = await db.getGroup(order.id);
+    const partial = group.length > 1;
+    if (partial && !(order.amount_cents > 0)) return res.status(409).json({ error: 'Esta carta no tiene monto que reembolsar.' });
+    await stripe.refunds.create({ payment_intent: order.stripe_payment_intent, ...(partial ? { amount: order.amount_cents } : {}) });
     const updated = await db.updateOrder(order.id, { status: 'refunded' });
     await email.orderRefunded(updated);
     res.json(updated);
@@ -631,6 +686,8 @@ admin.get('/check', async (_req, res) => {
   const settings = await db.getSettings();
   add('Sitio', 'Buzón', settings.mailboxOpen ? 'ok' : 'warn', settings.mailboxOpen ? 'abierto' : 'cerrado');
   add('Sitio', 'Precio', settings.priceCents >= 50 ? 'ok' : 'error', settings.priceCents ? `${(settings.priceCents / 100).toFixed(2)} USD` : 'falta');
+  add('Sitio', 'Carta adicional (hermanitos)', settings.extraPriceCents >= 50 && settings.extraPriceCents <= settings.priceCents ? 'ok' : 'warn',
+    `${(settings.extraPriceCents / 100).toFixed(2)} USD · hasta ${maxLetters()} cartas por compra`);
 
   res.json({ items, allLive: lobMode === 'live' && skMode === 'live' && !items.some((i) => i.status === 'error') });
 });
@@ -642,6 +699,11 @@ admin.patch('/settings', async (req, res) => {
     const n = Number(b.priceCents);
     if (!Number.isInteger(n) || n < 50) return res.status(400).json({ error: 'Precio inválido (en centavos, mínimo 50).' });
     patch.priceCents = n;
+  }
+  if (b.extraPriceCents !== undefined) {
+    const n = Number(b.extraPriceCents);
+    if (!Number.isInteger(n) || n < 50) return res.status(400).json({ error: 'Precio de carta adicional inválido (en centavos, mínimo 50).' });
+    patch.extraPriceCents = n;
   }
   if (b.mailboxOpen !== undefined) patch.mailboxOpen = Boolean(b.mailboxOpen);
   for (const k of ['deadlineRecommended', 'mailboxCloseDate']) {

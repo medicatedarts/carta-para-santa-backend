@@ -33,11 +33,12 @@ stub('lob.js', {
     return { id: 'ltr_' + order.id, expectedDelivery: '2026-12-01', price: 1.5 };
   },
 });
+const confirmations = [];
 stub('email.js', {
-  async orderConfirmation() {}, async alert(subject) { alerts.push(subject); },
+  async orderConfirmation(o) { confirmations.push(o); }, async alert(subject) { alerts.push(subject); },
 });
 
-const { sendToLob, afterPaid } = require('../fulfill');
+const { sendToLob, afterPaid, afterPaidGroup } = require('../fulfill');
 
 const mk = (id, extra = {}) => orders.set(id, { id, order_number: 'PN-' + id, status: 'paid', lob_letter_id: null, lob_attempts: 0, ...extra });
 
@@ -71,4 +72,14 @@ test('una orden con review_reason va a revisión y no a Lob', async () => {
   // y se aprueba desde el panel
   await sendToLob('d', { fromStatuses: ['needs_review'] });
   assert.strictEqual(orders.get('d').lob_letter_id, 'ltr_d');
+});
+
+test('combo: un solo correo de confirmación y cada carta a Lob con su propia llave', async () => {
+  mk('g1'); mk('g2'); mk('g3', { review_reason: 'revisar' });
+  lobBehavior = 'ok'; lobCalls.length = 0; confirmations.length = 0;
+  await afterPaidGroup(['g1', 'g2', 'g3'].map((id) => ({ ...orders.get(id) })));
+  assert.strictEqual(confirmations.length, 1);
+  assert.strictEqual(confirmations[0].length, 3);
+  assert.deepStrictEqual(lobCalls.map((c) => c.key), ['g1', 'g2']);
+  assert.strictEqual(orders.get('g3').status, 'needs_review');
 });

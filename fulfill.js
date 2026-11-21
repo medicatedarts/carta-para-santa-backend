@@ -41,9 +41,8 @@ async function sendToLob(orderId, { fromStatuses = ['paid', 'error'], idempotenc
   }
 }
 
-/** Después de marcar la orden pagada: correo de confirmación y revisión o envío. */
-async function afterPaid(order) {
-  await email.orderConfirmation(order);
+// Una carta ya pagada: a revisión si el filtro la marcó, o directo a Lob.
+async function reviewOrSend(order) {
   if (order.review_reason) {
     const updated = await db.updateOrder(order.id, { status: 'needs_review' });
     await email.alert('Carta pendiente de revisión', updated, order.review_reason);
@@ -52,4 +51,30 @@ async function afterPaid(order) {
   return sendToLob(order.id, { fromStatuses: ['paid'] });
 }
 
-module.exports = { sendToLob, afterPaid, MAX_AUTO_ATTEMPTS };
+/**
+ * Después de marcar pagadas las cartas de una compra: UN correo de confirmación con todas
+ * y luego cada carta por su cuenta (revisión o Lob). Si una falla, las demás siguen.
+ * @param {Object[]} orders  las órdenes recién pagadas de la compra
+ */
+async function afterPaidGroup(orders) {
+  if (!orders.length) return [];
+  await email.orderConfirmation(orders);
+  const out = [];
+  for (const order of orders) {
+    try {
+      out.push(await reviewOrSend(order));
+    } catch (err) {
+      // jobs.js retoma las cartas pagadas que no llegaron a Lob.
+      console.error(`Error enviando ${order.order_number} después del pago:`, err.message);
+      out.push(null);
+    }
+  }
+  return out;
+}
+
+/** Una sola orden (como antes del combo). */
+async function afterPaid(order) {
+  return (await afterPaidGroup([order]))[0];
+}
+
+module.exports = { sendToLob, afterPaid, afterPaidGroup, MAX_AUTO_ATTEMPTS };

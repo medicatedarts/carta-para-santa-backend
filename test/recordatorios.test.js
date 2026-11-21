@@ -12,6 +12,8 @@ const db = {
   rows: { 1: [], 2: [] },
   claimed: new Set(),
   getSettings: async () => ({ mailboxOpen: true, deadlineRecommended: '2026-12-12' }),
+  groups: {},
+  getGroup: async (id) => db.groups[id] || [],
   query: async (sql, params) => {
     calls.push(sql);
     if (sql.includes('SELECT o.* FROM orders o')) return { rows: sql.includes('reminder2_at IS NULL') ? db.rows[2] : db.rows[1] };

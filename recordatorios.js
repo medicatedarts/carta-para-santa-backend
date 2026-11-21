@@ -50,6 +50,7 @@ async function candidates(n) {
   const { rows } = await db.query(
     `SELECT o.* FROM orders o
       WHERE o.status = 'pending_payment' AND o.purged_at IS NULL
+        AND (o.group_id IS NULL OR o.group_id = o.id) -- combo: solo la carta principal; el correo habla de todas
         AND o.${s.col} IS NULL ${s.extra}
         AND o.promo_code IS NULL AND o.buyer_email IS NOT NULL
         AND o.created_at < now() - make_interval(hours => $1)
@@ -95,9 +96,13 @@ async function sendReminders() {
       const order = await claim(o.id, n);
       if (!order) continue;
       try {
+        // Combo de hermanitos: el total y el número de cartas de toda la compra.
+        const group = await db.getGroup(order.id);
+        const pending = group.length ? group.filter((g) => g.status === 'pending_payment') : [order];
         await email.abandonedReminder(order, n, {
           ...links(order),
-          priceCents: order.amount_cents,
+          priceCents: pending.reduce((sum, g) => sum + (g.amount_cents || 0), 0),
+          letters: pending.length,
           deadline: settings.deadlineRecommended,
         });
         sent++;

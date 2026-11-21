@@ -117,6 +117,16 @@ Pasos:
 
 `{ "orderNumber": "PN-48213", "status": "sent_to_lob", "expectedDelivery": "2026-12-03" }`. No devuelve datos personales.
 
+### Combo de hermanitos (desde el 21 nov 2026)
+
+- Una compra lleva de 1 a `MAX_LETTERS_PER_ORDER` cartas (4 por defecto). La primera cuesta `price_cents`; cada adicional, `extra_price_cents` (399 por defecto, editable en el panel; nunca más que la primera).
+- `POST /api/checkout` acepta `letters: [...]` (cada carta con su `shipName`, el nombre de su sobre). Sigue aceptando `letter` (una sola) por navegadores con la versión vieja en caché.
+- Cada carta es su propia orden (número, estado, envío a Lob con su `Idempotency-Key`). Las une `group_id`, que es el id de la primera; `letter_index` dice su posición. Una sola sesión de Stripe con una línea por carta; la metadata lleva el id de la primera.
+- El webhook marca pagadas todas las cartas del grupo, manda **un** correo de confirmación y luego procesa cada carta (revisión o Lob). `amount_cents` guarda la parte de cada carta; la primera se ajusta para que la suma sea `amount_total`.
+- Códigos: cada carta cuenta como un uso para el límite por correo (`PROMO_MAX_PER_EMAIL`). El descuento se reparte entre las cartas (`promo.splitCoupon`). En Stripe, `max_redemptions` cuenta compras, no cartas.
+- Reembolso desde el panel: en una compra con varias cartas se devuelve solo la parte de esa carta.
+- Recordatorios: solo a la carta principal, con el total y el número de cartas de toda la compra.
+
 ## 5. Validación (la misma en el frontend)
 
 | Campo | Regla |

@@ -25,32 +25,85 @@ function newOrderNumber() {
   return 'PN-' + crypto.randomInt(10000, 100000);
 }
 
-async function createOrder(o) {
+async function insertOrder(client, o) {
   for (let attempt = 0; attempt < 5; attempt++) {
+    // SAVEPOINT: dentro de una transacción, un número de orden repetido aborta todo;
+    // así solo se deshace este INSERT y se prueba otro número.
+    await client.query('SAVEPOINT ins');
     try {
-      const { rows } = await query(
+      const { rows } = await client.query(
         `INSERT INTO orders (
+           id, group_id, letter_index,
            order_number, status, design, greeting, child_name, child_age, message, gifts, farewell, signature,
            buyer_name, buyer_email, consent_at, consent_ip,
            ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_zip, ship_country,
            review_reason, amount_cents)
-         VALUES ($1,'pending_payment',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         VALUES ($22,$23,$24,$1,'pending_payment',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
          RETURNING *`,
         [
           newOrderNumber(), o.design, o.greeting, o.childName, o.childAge, o.message, JSON.stringify(o.gifts),
           o.farewell, o.signature, o.buyerName, o.buyerEmail, o.consentIp,
           o.ship.name, o.ship.line1, o.ship.line2, o.ship.city, o.ship.state, o.ship.zip, o.ship.country,
-          o.reviewReason, o.amountCents,
+          o.reviewReason, o.amountCents, o.id, o.groupId, o.letterIndex || 0,
         ]
       );
+      await client.query('RELEASE SAVEPOINT ins');
       return rows[0];
     } catch (err) {
+      await client.query('ROLLBACK TO SAVEPOINT ins');
       // 23505 = unique_violation (número de orden repetido): probar otro.
       if (err.code === '23505' && /order_number/.test(err.detail || err.constraint || '')) continue;
       throw err;
     }
   }
   throw new Error('No se pudo generar un número de orden único');
+}
+
+/**
+ * Crea las órdenes de una compra, una por carta (combo de hermanitos). Cada carta sigue
+ * siendo su propia orden: su número, su estado y su envío a Lob con su propia
+ * Idempotency-Key, como antes. Lo que las une es group_id, que es el id de la primera
+ * (la que lleva la sesión de Stripe). Todo en una transacción: o se crean todas o ninguna.
+ * @param {Object[]} list  datos de cada carta (como antes en createOrder)
+ * @returns {Promise<Object[]>} las órdenes en orden (letter_index 0, 1, …)
+ */
+async function createOrderGroup(list) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const groupId = crypto.randomUUID();
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      out.push(await insertOrder(client, {
+        ...list[i], id: i === 0 ? groupId : crypto.randomUUID(), groupId, letterIndex: i,
+      }));
+    }
+    await client.query('COMMIT');
+    return out;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function createOrder(o) {
+  return (await createOrderGroup([o]))[0];
+}
+
+// Todas las cartas de la compra a la que pertenece la orden `id` (o la orden sola si es de
+// antes del combo, cuando group_id no existía).
+async function getGroup(id) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(id))) return [];
+  const { rows } = await query(
+    `SELECT * FROM orders
+      WHERE id = $1
+         OR group_id = (SELECT group_id FROM orders WHERE id = $1 AND group_id IS NOT NULL)
+      ORDER BY letter_index, created_at`,
+    [id]
+  );
+  return rows;
 }
 
 async function getOrder(id) {
@@ -112,17 +165,37 @@ async function expireUnpaid() {
   return rowCount;
 }
 
-// Marca pagada solo si seguía pendiente (otro webhook repetido no la vuelve a procesar).
-async function markPaid(id, { sessionId, paymentIntent, amountCents }) {
+// Marca pagadas las cartas de la compra, solo las que seguían pendientes (un webhook repetido
+// no las vuelve a procesar: devuelve []). `id` es la orden principal (la de la sesión de Stripe).
+// Cada carta ya guarda su parte del precio desde que se creó; aquí la primera se ajusta para
+// que la suma sea exactamente lo que cobró Stripe (por si el redondeo de Stripe difiere).
+async function markPaidGroup(id, { sessionId, paymentIntent, amountCents }) {
+  const group = await getGroup(id);
+  if (!group.length) return [];
   const { rows } = await query(
     `UPDATE orders
-        SET status = 'paid', paid_at = now(), stripe_session_id = $2, stripe_payment_intent = $3,
-            amount_cents = COALESCE($4, amount_cents)
-      WHERE id = $1 AND status = 'pending_payment'
+        SET status = 'paid', paid_at = now(), stripe_session_id = $2, stripe_payment_intent = $3
+      WHERE id = ANY($1::uuid[]) AND status = 'pending_payment'
       RETURNING *`,
-    [id, sessionId, paymentIntent, amountCents]
+    [group.map((o) => o.id), sessionId, paymentIntent]
   );
-  return rows[0] || null;
+  if (!rows.length) return [];
+  rows.sort((a, b) => a.letter_index - b.letter_index);
+  if (amountCents != null && rows.length === group.length) {
+    const others = rows.slice(1).reduce((sum, o) => sum + (o.amount_cents || 0), 0);
+    const first = Math.max(0, amountCents - others);
+    if (first !== rows[0].amount_cents) {
+      await query('UPDATE orders SET amount_cents = $2 WHERE id = $1', [rows[0].id, first]);
+      rows[0].amount_cents = first;
+    }
+  }
+  return rows;
+}
+
+// Una sola orden (se mantiene para el código y las pruebas de antes del combo).
+async function markPaid(id, payment) {
+  const rows = await markPaidGroup(id, payment);
+  return rows.find((o) => o.id === id) || rows[0] || null;
 }
 
 async function listOrders({ status, q, limit = 50, offset = 0 }) {
@@ -138,7 +211,8 @@ async function listOrders({ status, q, limit = 50, offset = 0 }) {
   const { rows } = await query(
     `SELECT id, order_number, status, design, child_name, buyer_email, ship_name, ship_city, ship_state,
             amount_cents, review_reason, error, created_at, paid_at, mailed_at, lob_expected_delivery,
-            reminder1_at, reminder2_at
+            reminder1_at, reminder2_at, group_id, letter_index,
+            (SELECT count(*) FROM orders g WHERE g.group_id = orders.group_id)::int AS group_size
        FROM orders ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
@@ -169,13 +243,15 @@ async function deleteOrder(id) {
 }
 
 // ---------- settings (lo que se edita desde el panel) ----------
-const SETTING_KEYS = ['price_cents', 'mailbox_open', 'deadline_recommended', 'mailbox_close_date'];
+const SETTING_KEYS = ['price_cents', 'extra_price_cents', 'mailbox_open', 'deadline_recommended', 'mailbox_close_date'];
 
 async function getSettings() {
   const { rows } = await query('SELECT key, value FROM settings');
   const s = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   return {
     priceCents: Number(s.price_cents ?? process.env.LETTER_PRICE_CENTS ?? 0),
+    // Precio de cada carta adicional en la misma compra (combo de hermanitos).
+    extraPriceCents: Number(s.extra_price_cents ?? process.env.EXTRA_LETTER_PRICE_CENTS ?? 399),
     mailboxOpen: s.mailbox_open ?? true,
     deadlineRecommended: s.deadline_recommended ?? process.env.DEADLINE_RECOMMENDED ?? null,
     mailboxCloseDate: s.mailbox_close_date ?? process.env.MAILBOX_CLOSE_DATE ?? null,
@@ -184,7 +260,7 @@ async function getSettings() {
 
 async function setSettings(patch) {
   const map = {
-    priceCents: 'price_cents', mailboxOpen: 'mailbox_open',
+    priceCents: 'price_cents', extraPriceCents: 'extra_price_cents', mailboxOpen: 'mailbox_open',
     deadlineRecommended: 'deadline_recommended', mailboxCloseDate: 'mailbox_close_date',
   };
   for (const [k, col] of Object.entries(map)) {
@@ -208,6 +284,10 @@ async function ensureSchema() {
   await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder2_at timestamptz');
   // Quien pide no recibir más recordatorios. Se guarda el hash del correo, no el correo.
   await query('CREATE TABLE IF NOT EXISTS reminder_optouts (email_hash text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now())');
+  // Combo de hermanitos: las cartas de una misma compra comparten group_id (el id de la primera).
+  await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS group_id uuid');
+  await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS letter_index smallint NOT NULL DEFAULT 0');
+  await query('CREATE INDEX IF NOT EXISTS orders_group_idx ON orders (group_id)');
 }
 
 // Veces que un correo ha usado un código. Cuentan las órdenes pagadas o en curso; las
@@ -225,6 +305,6 @@ async function countPromoUses(email, code) {
 }
 
 module.exports = {
-  ensureSchema, countPromoUses, expireUnpaid, pool, query, createOrder, getOrder, getOrderByLobId, updateOrder, claimForLob, markPaid,
+  ensureSchema, countPromoUses, expireUnpaid, pool, query, createOrder, createOrderGroup, getGroup, markPaidGroup, getOrder, getOrderByLobId, updateOrder, claimForLob, markPaid,
   listOrders, stats, deleteOrder, getSettings, setSettings,
 };

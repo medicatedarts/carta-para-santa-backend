@@ -80,3 +80,8 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder1_at timestamptz;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder2_at timestamptz;
 CREATE TABLE IF NOT EXISTS reminder_optouts (email_hash text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now());
+-- Combo de hermanitos (21 nov 2026): las cartas de una misma compra comparten group_id.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS group_id uuid;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS letter_index smallint NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS orders_group_idx ON orders (group_id);
+INSERT INTO settings (key, value) VALUES ('extra_price_cents', '399') ON CONFLICT (key) DO NOTHING;

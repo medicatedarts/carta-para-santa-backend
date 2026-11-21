@@ -66,22 +66,37 @@ const dateEs = (d) => {
   return dt.toLocaleDateString('es-PR', { day: 'numeric', month: 'long', timeZone: 'America/Puerto_Rico' });
 };
 
-function orderConfirmation(order) {
-  const childData = [order.child_name && 'nombre', order.child_age && 'edad', 'el texto de la carta y la lista de regalos']
+// Confirmación del pago. Recibe una orden o las órdenes de una compra (combo de hermanitos):
+// siempre se manda UN solo correo con todas las cartas.
+function orderConfirmation(orderOrList) {
+  const orders = Array.isArray(orderOrList) ? orderOrList : [orderOrList];
+  const order = orders[0];
+  const many = orders.length > 1;
+  const total = orders.reduce((sum, o) => sum + (o.amount_cents || 0), 0);
+  const childData = [orders.some((o) => o.child_name) && 'nombre', orders.some((o) => o.child_age) && 'edad', 'el texto de la carta y la lista de regalos']
     .filter(Boolean).join(', ');
+  const numbers = orders.map((o) => o.order_number).join(', ');
+  const address = `${esc(order.ship_line1)}${order.ship_line2 ? '<br>' + esc(order.ship_line2) : ''}<br>${esc(order.ship_city)}, ${esc(order.ship_state)} ${esc(order.ship_zip)}`;
+  const rows = many
+    ? `<tr><td style="color:#5A645F;vertical-align:top">Cartas</td><td>${orders.map((o, i) =>
+        `<strong>${i + 1}. ${esc(o.ship_name)}</strong> · ${esc(DESIGN_NAMES[o.design] || o.design)}<br><span style="color:#5A645F;font-size:13px">Orden ${esc(o.order_number)}</span>`).join('<br>')}</td></tr>
+<tr><td style="color:#5A645F;vertical-align:top">Dirección</td><td>${address}</td></tr>`
+    : `<tr><td style="color:#5A645F">Orden</td><td><strong>${esc(order.order_number)}</strong></td></tr>
+<tr><td style="color:#5A645F">Diseño</td><td>${esc(DESIGN_NAMES[order.design] || order.design)}</td></tr>
+<tr><td style="color:#5A645F">Para</td><td>${esc(order.ship_name)}<br>${address}</td></tr>`;
   return send({
     to: order.buyer_email,
-    subject: `¡Tu carta llegó al Polo Norte! (${order.order_number})`,
-    html: layout('¡Ho, ho, ho! Tu carta llegó al Polo Norte', `
-<p style="font-size:16px;line-height:1.6">Hola, ${esc(order.buyer_name)}: recibimos tu pedido y el pago. Los duendes ya están preparando la respuesta de Santa.</p>
+    subject: many ? `¡Tus ${orders.length} cartas llegaron al Polo Norte! (${numbers})` : `¡Tu carta llegó al Polo Norte! (${order.order_number})`,
+    html: layout(many ? `¡Ho, ho, ho! Tus ${orders.length} cartas llegaron al Polo Norte` : '¡Ho, ho, ho! Tu carta llegó al Polo Norte', `
+<p style="font-size:16px;line-height:1.6">Hola, ${esc(order.buyer_name)}: recibimos tu pedido y el pago. Los duendes ya están preparando ${many ? 'las respuestas' : 'la respuesta'} de Santa.</p>
 <table role="presentation" cellpadding="6" style="font-size:15px;margin:12px 0">
-<tr><td style="color:#5A645F">Orden</td><td><strong>${esc(order.order_number)}</strong></td></tr>
-<tr><td style="color:#5A645F">Diseño</td><td>${esc(DESIGN_NAMES[order.design] || order.design)}</td></tr>
-<tr><td style="color:#5A645F">Para</td><td>${esc(order.ship_name)}<br>${esc(order.ship_line1)}${order.ship_line2 ? '<br>' + esc(order.ship_line2) : ''}<br>${esc(order.ship_city)}, ${esc(order.ship_state)} ${esc(order.ship_zip)}</td></tr>
-<tr><td style="color:#5A645F">Total</td><td>${order.amount_cents ? money(order.amount_cents) : 'Gratis (código de descuento)'}</td></tr>
+${rows}
+<tr><td style="color:#5A645F">Total</td><td>${total ? money(total) : 'Gratis (código de descuento)'}</td></tr>
 </table>
-<p style="font-size:15px;line-height:1.6">Te escribiremos otra vez cuando la carta salga del Polo Norte. Llega por correo postal en un sobre blanco con ventana, con la respuesta de Santa y una copia de la carta original.</p>
-<p style="font-size:13px;line-height:1.6;color:#5A645F">Para hacer la carta guardamos ${esc(childData)}. Lo usamos solo para imprimirla y lo borramos después de la entrega, según nuestra política de privacidad.</p>`),
+<p style="font-size:15px;line-height:1.6">${many
+  ? 'Cada nene recibe su propio sobre blanco con ventana, con la respuesta de Santa y la copia de su carta. Los sobres pueden llegar en días distintos. Te escribiremos cuando salga cada uno.'
+  : 'Te escribiremos otra vez cuando la carta salga del Polo Norte. Llega por correo postal en un sobre blanco con ventana, con la respuesta de Santa y una copia de la carta original.'}</p>
+<p style="font-size:13px;line-height:1.6;color:#5A645F">Para hacer ${many ? 'las cartas' : 'la carta'} guardamos ${esc(childData)}. Lo usamos solo para imprimir${many ? 'las' : 'la'} y lo borramos después de la entrega, según nuestra política de privacidad.</p>`),
   });
 }
 
@@ -107,15 +122,18 @@ function orderRefunded(order) {
 
 // Alerta interna: sin datos personales del niño, solo lo necesario para encontrar la orden.
 // Recordatorio de compra sin terminar (recordatorios.js). n = 1 (a la hora) o 2 (a las 20 h).
-function abandonedReminder(order, n, { resumeUrl, optOutUrl, priceCents, deadline }) {
-  const who = order.child_name ? esc(order.child_name) : 'tu niño o niña';
+function abandonedReminder(order, n, { resumeUrl, optOutUrl, priceCents, deadline, letters = 1 }) {
+  const first = order.child_name ? esc(order.child_name) : 'tu niño o niña';
+  // Combo de hermanitos: "la carta de Sofía y 1 más".
+  const who = letters > 1 ? `${first}</strong> y <strong>${letters - 1} ${letters === 2 ? 'nene' : 'nenes'} más` : first;
+  const carta = letters > 1 ? 'Las cartas' : 'La carta';
   const hola = order.buyer_name ? esc(String(order.buyer_name).split(' ')[0]) : '';
   const when = dateEs(deadline);
   const subject = n === 1 ? 'Tu carta a Santa está casi lista 🎅' : 'Última llamada del Polo Norte: tu carta se borra pronto';
   const title = n === 1 ? 'Tu carta está casi lista' : 'Tu carta se borra en unas horas';
   const intro = n === 1
-    ? `Los duendes encontraron la carta de <strong>${who}</strong> en el buzón, pero le falta el último paso para salir hacia el Polo Norte.`
-    : `La carta de <strong>${who}</strong> sigue esperando en el buzón, pero por privacidad la guardamos solo 24 horas y se borra en unas horas. Si todavía quieres que Santa la reciba, aún estás a tiempo.`;
+    ? `Los duendes encontraron ${carta.toLowerCase()} de <strong>${who}</strong> en el buzón, pero ${letters > 1 ? 'les' : 'le'} falta el último paso para salir hacia el Polo Norte.`
+    : `${carta} de <strong>${who}</strong> ${letters > 1 ? 'siguen' : 'sigue'} esperando en el buzón, pero por privacidad ${letters > 1 ? 'las' : 'la'} guardamos solo 24 horas y se ${letters > 1 ? 'borran' : 'borra'} en unas horas. Si todavía quieres que Santa ${letters > 1 ? 'las' : 'la'} reciba, aún estás a tiempo.`;
   const btn = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0"><tr><td style="background:#A53328;border-radius:999px">
 <a href="${esc(resumeUrl)}" style="display:inline-block;padding:14px 26px;color:#FFFFFF;font-weight:bold;font-size:16px;text-decoration:none">Terminar mi envío al Polo Norte</a></td></tr></table>`;
   return send({
@@ -125,7 +143,7 @@ function abandonedReminder(order, n, { resumeUrl, optOutUrl, priceCents, deadlin
     html: layout(title, `
 <p style="font-size:16px;line-height:1.6">¡Hola${hola ? ', ' + hola : ''}! ${intro}</p>
 <table role="presentation" cellpadding="6" style="font-size:15px;margin:8px 0">
-<tr><td style="color:#5A645F">Diseño</td><td>${esc(DESIGN_NAMES[order.design] || order.design)}</td></tr>
+${letters > 1 ? `<tr><td style="color:#5A645F">Cartas</td><td>${letters}</td></tr>` : `<tr><td style="color:#5A645F">Diseño</td><td>${esc(DESIGN_NAMES[order.design] || order.design)}</td></tr>`}
 <tr><td style="color:#5A645F">Total</td><td><strong>${money(priceCents)}</strong> (envío e IVU incluidos)</td></tr>
 </table>
 ${btn}

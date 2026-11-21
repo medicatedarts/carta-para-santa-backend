@@ -78,3 +78,34 @@ test('respuesta de Santa: sin nombre de niño usa el del sobre; sin nada, saludo
   assert.strictEqual(r.greeting, 'Hola, amiguito o amiguita:');
   assert.match(r.paragraphs[2], /No me pediste nada/);
 });
+
+// ---------- Combo de hermanitos ----------
+const combo = () => {
+  const b = base();
+  const segunda = { ...b.letter, childName: 'Diego', message: 'Quiero un camión.', gifts: ['Camión'], shipName: 'Diego Rivera' };
+  b.letters = [{ ...b.letter, shipName: 'Sofía Rivera' }, segunda];
+  delete b.letter;
+  return b;
+};
+
+test('combo: valida varias cartas, cada una con su nombre en el sobre', () => {
+  const r = validateCheckout(combo());
+  assert.strictEqual(r.letters.length, 2);
+  assert.strictEqual(r.letters[0].shipName, 'Sofía Rivera');
+  assert.strictEqual(r.letters[1].shipName, 'Diego Rivera');
+  assert.strictEqual(r.letter, r.letters[0]);
+});
+
+test('combo: sin nombre propio en el sobre usa el de la dirección', () => {
+  const b = combo(); delete b.letters[1].shipName;
+  assert.strictEqual(validateCheckout(b).letters[1].shipName, 'Sofía Rivera');
+  b.shipTo.name = ''; b.letters[0].shipName = '';
+  assert.throws(() => validateCheckout(b), /sobre de la carta 1/);
+});
+
+test('combo: el error dice qué carta tiene el problema y hay un máximo de cartas', () => {
+  const b = combo(); b.letters[1].message = ''; b.letters[1].gifts = [];
+  assert.throws(() => validateCheckout(b), /^Error: Carta 2: Escribe un mensaje/);
+  const c = combo(); c.letters = Array(5).fill(c.letters[0]);
+  assert.throws(() => validateCheckout(c), /hasta 4 cartas/);
+});

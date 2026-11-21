@@ -43,3 +43,27 @@ test('checkPromo rechaza códigos agotados, inexistentes o con caracteres raros'
     assert.strictEqual((await checkPromo(fakeStripe(FAMILIA), "x'; drop", 'a@b.co', 799)).ok, false);
   } finally { db.countPromoUses = orig; }
 });
+
+// ---------- Combo de hermanitos ----------
+const { splitCoupon } = require('../promo');
+
+test('splitCoupon reparte el descuento y las partes suman el total con descuento', () => {
+  assert.deepStrictEqual(splitCoupon([599, 399, 399], { percent_off: 100 }), [0, 0, 0]);
+  const p = splitCoupon([599, 399, 399], { percent_off: 15 });
+  assert.strictEqual(p.reduce((a, b) => a + b, 0), applyCoupon(1397, { percent_off: 15 }));
+  // Monto fijo: sale de la primera carta y lo que sobra, de la siguiente.
+  assert.deepStrictEqual(splitCoupon([599, 399], { amount_off: 700 }), [0, 298]);
+});
+
+test('checkPromo con varias cartas: cada carta cuenta como un uso del código', async () => {
+  const orig = db.countPromoUses;
+  try {
+    db.countPromoUses = async () => 2;
+    const ok = await checkPromo(fakeStripe(FAMILIA), 'FAMILIA2026', 'a@b.co', [599, 399]);
+    assert.ok(ok.ok);
+    assert.deepStrictEqual(ok.parts, [0, 0]);
+    const no = await checkPromo(fakeStripe(FAMILIA), 'FAMILIA2026', 'a@b.co', [599, 399, 399]);
+    assert.strictEqual(no.code, 'promo_email_limit');
+    assert.match(no.message, /2 veces más/);
+  } finally { db.countPromoUses = orig; }
+});

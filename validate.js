@@ -44,20 +44,21 @@ function fail(message) {
   return err;
 }
 
-/**
- * Valida y normaliza el cuerpo de POST /api/checkout.
- * Devuelve { letter, buyer, shipTo, consent } limpio o lanza un error con code 'validation'
- * o 'consent_required' y un mensaje listo para mostrar.
- */
-function validateCheckout(body) {
-  const b = body || {};
-  const l = b.letter || {};
-  const buyer = b.buyer || {};
-  const ship = b.shipTo || {};
-  const consent = b.consent || {};
+// Máximo de cartas en una misma compra (combo de hermanitos). Debe coincidir con el frontend.
+function maxLetters() {
+  const n = parseInt(process.env.MAX_LETTERS_PER_ORDER || '4', 10);
+  return Number.isInteger(n) && n >= 1 && n <= 10 ? n : 4;
+}
+
+// Valida una carta. "n" es su número en la compra (1, 2…) para que el mensaje de error
+// diga cuál carta tiene el problema cuando hay varias.
+function validateLetter(l, n, total) {
+  l = l || {};
+  const where = total > 1 ? `Carta ${n}: ` : '';
+  const err = (m) => fail(where + m);
 
   const design = DESIGNS.includes(l.design) ? l.design : null;
-  if (!design) throw fail('Escoge uno de los diseños de carta.');
+  if (!design) throw err('Escoge uno de los diseños de carta.');
 
   const greeting = clean(l.greeting) || 'Querido Santa:';
   const childName = clean(l.childName);
@@ -69,7 +70,7 @@ function validateCheckout(body) {
   if (l.childAge !== undefined && l.childAge !== null && String(l.childAge).trim() !== '') {
     childAge = Number(l.childAge);
     if (!Number.isInteger(childAge) || childAge < 1 || childAge > 17) {
-      throw fail('La edad debe ser un número entre 1 y 17.');
+      throw err('La edad debe ser un número entre 1 y 17.');
     }
   }
 
@@ -82,10 +83,36 @@ function validateCheckout(body) {
     [farewell, LIMITS.farewell, 'La despedida'],
     [signature, LIMITS.signature, 'La firma'],
   ].find(([v, max]) => v.length > max);
-  if (tooLong) throw fail(`${tooLong[2]} es demasiado largo (máximo ${tooLong[1]} caracteres).`);
-  if (gifts.length > LIMITS.gifts) throw fail(`La lista puede tener hasta ${LIMITS.gifts} regalos.`);
-  if (gifts.some((g) => g.length > LIMITS.gift)) throw fail(`Cada regalo puede tener hasta ${LIMITS.gift} caracteres.`);
-  if (!message && gifts.length === 0) throw fail('Escribe un mensaje o al menos un regalo para Santa.');
+  if (tooLong) throw err(`${tooLong[2]} es demasiado largo (máximo ${tooLong[1]} caracteres).`);
+  if (gifts.length > LIMITS.gifts) throw err(`La lista puede tener hasta ${LIMITS.gifts} regalos.`);
+  if (gifts.some((g) => g.length > LIMITS.gift)) throw err(`Cada regalo puede tener hasta ${LIMITS.gift} caracteres.`);
+  if (!message && gifts.length === 0) throw err('Escribe un mensaje o al menos un regalo para Santa.');
+
+  // Nombre en el sobre de ESTA carta: cada nene recibe su propio sobre, a la misma dirección.
+  const shipName = clean(l.shipName);
+  if (shipName.length > LIMITS.shipName) throw err('El nombre en el sobre es demasiado largo.');
+
+  return { design, greeting, childName, childAge, message, gifts, farewell, signature, shipName };
+}
+
+/**
+ * Valida y normaliza el cuerpo de POST /api/checkout.
+ * Acepta `letters` (1 a maxLetters cartas, combo de hermanitos) o `letter` (una sola, como
+ * mandaban las páginas antes del combo: puede haber navegadores con la versión vieja en caché).
+ * Devuelve { letters, letter, buyer, shipTo } limpio o lanza un error con code 'validation'
+ * o 'consent_required' y un mensaje listo para mostrar. `letter` es la primera carta.
+ */
+function validateCheckout(body) {
+  const b = body || {};
+  const buyer = b.buyer || {};
+  const ship = b.shipTo || {};
+  const consent = b.consent || {};
+
+  const rawLetters = Array.isArray(b.letters) ? b.letters : (b.letter ? [b.letter] : []);
+  if (!rawLetters.length) throw fail('Falta la carta.');
+  const max = maxLetters();
+  if (rawLetters.length > max) throw fail(`Puedes enviar hasta ${max} cartas en una misma compra.`);
+  const letters = rawLetters.map((l, i) => validateLetter(l, i + 1, rawLetters.length));
 
   // Adulto
   const buyerName = clean(buyer.name);
@@ -95,7 +122,7 @@ function validateCheckout(body) {
     throw fail('Revisa el correo electrónico.');
   }
 
-  // Dirección
+  // Dirección (la misma para todas las cartas)
   const shipTo = {
     name: clean(ship.name),
     line1: clean(ship.line1),
@@ -110,7 +137,13 @@ function validateCheckout(body) {
     err.code = 'address_unsupported';
     throw err;
   }
-  if (!shipTo.name || shipTo.name.length > LIMITS.shipName) throw fail('Escribe el nombre que va en el sobre.');
+  if (shipTo.name.length > LIMITS.shipName) throw fail('El nombre en el sobre es demasiado largo.');
+  // Cada carta usa su propio nombre en el sobre; si no trae uno, el de la dirección.
+  letters.forEach((l, i) => {
+    if (!l.shipName) l.shipName = shipTo.name;
+    if (!l.shipName) throw fail(letters.length > 1 ? `Escribe el nombre que va en el sobre de la carta ${i + 1}.` : 'Escribe el nombre que va en el sobre.');
+  });
+  if (!shipTo.name) shipTo.name = letters[0].shipName;
   if (!shipTo.line1 || shipTo.line1.length > LIMITS.line) throw fail('Escribe la dirección.');
   if (shipTo.line2.length > LIMITS.line) throw fail('La segunda línea de la dirección es demasiado larga.');
   if (!shipTo.city || shipTo.city.length > LIMITS.city) throw fail('Escribe la ciudad o el pueblo.');
@@ -126,10 +159,11 @@ function validateCheckout(body) {
   }
 
   return {
-    letter: { design, greeting, childName, childAge, message, gifts, farewell, signature },
+    letters,
+    letter: letters[0],
     buyer: { name: buyerName, email: buyerEmail },
     shipTo,
   };
 }
 
-module.exports = { validateCheckout, clean, DESIGNS, LIMITS, US_STATES };
+module.exports = { validateCheckout, validateLetter, maxLetters, clean, DESIGNS, LIMITS, US_STATES };
