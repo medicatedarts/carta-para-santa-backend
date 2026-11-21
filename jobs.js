@@ -5,6 +5,7 @@
 //  - Cada 10 min: retoma órdenes pagadas que no llegaron a Lob (el proceso murió a
 //    mitad del webhook) y reintenta las que fallaron por un error temporal de Lob.
 //  - Cada 10 min: avisa de órdenes pagadas que llevan más de 1 hora sin enviarse.
+//  - Cada 5 min: recordatorios de compra sin terminar, a la hora y a las 20 h (recordatorios.js).
 //  - Cada 30 min: cancela y borra las órdenes que llevan 25 h sin pagarse.
 //  - Cada 6 h: borra el contenido de la carta y la dirección de las órdenes ya
 //    entregadas hace más de RETENTION_DAYS_AFTER_DELIVERY días (privacidad, COPPA).
@@ -12,6 +13,7 @@
 const db = require('./db');
 const email = require('./email');
 const { sendToLob, MAX_AUTO_ATTEMPTS } = require('./fulfill');
+const { sendReminders } = require('./recordatorios');
 
 const alerted = new Set(); // para no repetir la misma alerta cada 10 minutos
 
@@ -73,8 +75,10 @@ function startJobs() {
   setInterval(safe(retryStuck, 'retryStuck'), 10 * 60 * 1000);
   setTimeout(safe(expireUnpaid, 'expireUnpaid'), 45 * 1000);
   setInterval(safe(expireUnpaid, 'expireUnpaid'), 30 * 60 * 1000);
+  setTimeout(safe(sendReminders, 'sendReminders'), 90 * 1000);
+  setInterval(safe(sendReminders, 'sendReminders'), 5 * 60 * 1000);
   setTimeout(safe(purgeOld, 'purgeOld'), 60 * 1000);
   setInterval(safe(purgeOld, 'purgeOld'), 6 * 60 * 60 * 1000);
 }
 
-module.exports = { startJobs, retryStuck, purgeOld, expireUnpaid };
+module.exports = { startJobs, retryStuck, purgeOld, expireUnpaid, sendReminders };

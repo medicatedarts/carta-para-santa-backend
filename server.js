@@ -27,6 +27,7 @@ const email = require('./email');
 const { sendToLob, afterPaid } = require('./fulfill');
 const { startJobs } = require('./jobs');
 const metaCapi = require('./metaCapi');
+const recordatorios = require('./recordatorios');
 
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5500').replace(/\/$/, '');
@@ -238,6 +239,112 @@ app.post('/api/promo', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
   }
 });
 
+// Sesión de pago de Stripe para una orden ya creada. La usan el checkout y el enlace de
+// los recordatorios (/r/pagar), que abre una sesión nueva para la misma orden.
+function createStripeSession(order, { priceCents, promo = null, metaMetadata = {}, expiresAt } = {}) {
+  return stripe.checkout.sessions.create({
+    mode: 'payment',
+    payment_method_types: ['card'],
+    // El código se aplica desde nuestro formulario (promo.js), no en la página de Stripe,
+    // para poder limitar los usos por correo.
+    ...(promo ? { discounts: [{ promotion_code: promo.promotionCodeId }] } : {}),
+    ...(expiresAt ? { expires_at: expiresAt } : {}),
+    customer_email: order.buyer_email,
+    line_items: [{
+      price_data: {
+        currency: process.env.STRIPE_CURRENCY || 'usd',
+        // Precio de lista; si hay código, Stripe aplica el descuento encima.
+        unit_amount: priceCents,
+        product_data: {
+          name: 'Carta de respuesta de Santa — impresa y enviada por correo',
+          description: `Para: ${order.ship_name} · Orden ${order.order_number}`,
+        },
+      },
+      quantity: 1,
+    }],
+    metadata: { orderId: order.id, orderNumber: order.order_number, ...metaMetadata },
+    payment_intent_data: { metadata: { orderId: order.id, orderNumber: order.order_number } },
+    success_url: `${FRONTEND_URL}/gracias.html?order=${order.id}`,
+    cancel_url: `${FRONTEND_URL}/enviar.html?cancelado=1`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Enlaces de los correos de recordatorio (recordatorios.js). Van firmados y vencen.
+// ---------------------------------------------------------------------------
+// Retomar el pago: abre una sesión nueva de Stripe para la MISMA orden. Antes se
+// revisa la sesión anterior: si ya se pagó (y el webhook no ha llegado) no se crea otra,
+// y si sigue abierta se expira para que no se pueda pagar dos veces.
+app.get('/r/pagar/:id', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
+  if (!printUrl.verify(req.path, req.query.exp, req.query.sig)) {
+    return res.redirect(303, `${FRONTEND_URL}/carta.html`);
+  }
+  const id = req.params.id;
+  try {
+    const order = await db.getOrder(id);
+    if (!order || order.purged_at || order.status === 'cancelled' || order.status === 'refunded') {
+      return res.redirect(303, `${FRONTEND_URL}/carta.html`);
+    }
+    if (order.status !== 'pending_payment') return res.redirect(303, `${FRONTEND_URL}/gracias.html?order=${order.id}`);
+
+    if (order.stripe_session_id) {
+      const prev = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+      if (prev.status === 'complete') return res.redirect(303, `${FRONTEND_URL}/gracias.html?order=${order.id}`);
+      if (prev.status === 'open') await stripe.checkout.sessions.expire(prev.id);
+    }
+
+    // La sesión nueva vence antes del borrado automático (25 h), para que nadie pague
+    // una orden que ya no existe. Stripe pide al menos 30 minutos.
+    const purgeAt = Math.floor(new Date(order.created_at).getTime() / 1000) + 25 * 3600 - 10 * 60;
+    const now = Math.floor(Date.now() / 1000);
+    if (purgeAt - now < 31 * 60) return res.redirect(303, `${FRONTEND_URL}/carta.html`);
+    const expiresAt = Math.min(purgeAt, now + 23 * 3600);
+
+    const session = await createStripeSession(order, { priceCents: order.amount_cents, expiresAt });
+    await db.updateOrder(order.id, { stripe_session_id: session.id });
+    console.log(`💌 Orden ${order.order_number}: volvió desde el recordatorio`);
+    res.redirect(303, session.url);
+  } catch (err) {
+    console.error('Error retomando el pago:', err.message);
+    res.status(500).type('html').send(simplePage('Algo salió mal', 'No pudimos abrir el pago. Intenta otra vez en unos minutos o responde al correo y te ayudamos.'));
+  }
+});
+
+// Baja de los recordatorios. GET muestra un botón (los antivirus de correo abren los
+// enlaces solos y no queremos dar de baja por error); POST la registra. El POST también
+// sirve para la baja en un clic de Gmail y Apple Mail (cabecera List-Unsubscribe-Post).
+app.get('/r/baja/:hash', (req, res) => {
+  if (!printUrl.verify(req.path, req.query.exp, req.query.sig)) {
+    return res.status(403).type('html').send(simplePage('Enlace vencido', 'Este enlace ya no es válido. Responde a cualquiera de nuestros correos y te quitamos de la lista.'));
+  }
+  const action = `${req.path}?exp=${encodeURIComponent(req.query.exp)}&sig=${encodeURIComponent(req.query.sig)}`;
+  res.type('html').send(simplePage('¿Dejar de recibir recordatorios?',
+    'Si pulsas el botón no te volveremos a escribir para recordarte un pedido sin terminar. Los correos de tus pedidos pagados (confirmación y envío) sí te seguirán llegando.',
+    `<form method="post" action="${action}"><button type="submit">No quiero más recordatorios</button></form>`));
+});
+app.post('/r/baja/:hash', express.urlencoded({ extended: false }), async (req, res) => {
+  if (!printUrl.verify(req.path, req.query.exp, req.query.sig)) return res.status(403).type('html').send(simplePage('Enlace vencido', 'Este enlace ya no es válido.'));
+  try {
+    await recordatorios.optOut(req.params.hash);
+    res.type('html').send(simplePage('Listo', 'No te enviaremos más recordatorios. ¡Feliz Navidad! 🎄'));
+  } catch (err) {
+    console.error('Error registrando la baja:', err.message);
+    res.status(500).type('html').send(simplePage('Algo salió mal', 'No pudimos registrar la baja. Responde a nuestro correo y te quitamos a mano.'));
+  }
+});
+
+function simplePage(title, text, extra = '') {
+  const e = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>${e(title)} · CartaParaSanta.com</title>
+<style>body{margin:0;font-family:Georgia,serif;background:#FBF6EE;color:#2B2622;display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}
+main{max-width:460px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 6px 24px rgba(0,0,0,.08);text-align:center}
+h1{color:#A53328;font-size:26px;margin:0 0 12px}p{font-size:17px;line-height:1.55}
+button{min-height:48px;padding:12px 24px;border:0;border-radius:999px;background:#A53328;color:#fff;font-size:17px;font-weight:bold;cursor:pointer}
+a{color:#376A49}</style></head><body><main><h1>${e(title)}</h1><p>${e(text)}</p>${extra}
+<p><a href="${e(FRONTEND_URL)}/">Volver a CartaParaSanta.com</a></p></main></body></html>`;
+}
+
 app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
   try {
     const settings = await db.getSettings();
@@ -295,29 +402,7 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
       ? Object.fromEntries(Object.entries(attribution).filter(([, v]) => v))
       : {};
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      // El código se aplica desde nuestro formulario (promo.js), no en la página de Stripe,
-      // para poder limitar los usos por correo.
-      ...(promo ? { discounts: [{ promotion_code: promo.promotionCodeId }] } : {}),
-      customer_email: data.buyer.email,
-      line_items: [{
-        price_data: {
-          currency: process.env.STRIPE_CURRENCY || 'usd',
-          unit_amount: settings.priceCents,
-          product_data: {
-            name: 'Carta de respuesta de Santa — impresa y enviada por correo',
-            description: `Para: ${data.shipTo.name} · Orden ${order.order_number}`,
-          },
-        },
-        quantity: 1,
-      }],
-      metadata: { orderId: order.id, orderNumber: order.order_number, ...metaMetadata },
-      payment_intent_data: { metadata: { orderId: order.id, orderNumber: order.order_number } },
-      success_url: `${FRONTEND_URL}/gracias.html?order=${order.id}`,
-      cancel_url: `${FRONTEND_URL}/enviar.html?cancelado=1`,
-    });
+    const session = await createStripeSession(order, { priceCents: settings.priceCents, promo, metaMetadata });
 
     await db.updateOrder(order.id, { stripe_session_id: session.id, promo_code: promo ? promo.code : null });
     console.log(`🧾 Orden ${order.order_number} creada${order.review_reason ? ' (irá a revisión)' : ''}`);

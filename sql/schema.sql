@@ -77,3 +77,6 @@ ON CONFLICT (key) DO NOTHING;
 -- Bases creadas antes del 9 nov 2026 tenían un CHECK con solo 5 diseños.
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_design_check;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder1_at timestamptz;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder2_at timestamptz;
+CREATE TABLE IF NOT EXISTS reminder_optouts (email_hash text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now());

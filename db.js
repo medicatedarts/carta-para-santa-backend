@@ -137,7 +137,8 @@ async function listOrders({ status, q, limit = 50, offset = 0 }) {
   params.push(Math.min(Number(limit) || 50, 200), Number(offset) || 0);
   const { rows } = await query(
     `SELECT id, order_number, status, design, child_name, buyer_email, ship_name, ship_city, ship_state,
-            amount_cents, review_reason, error, created_at, paid_at, mailed_at, lob_expected_delivery
+            amount_cents, review_reason, error, created_at, paid_at, mailed_at, lob_expected_delivery,
+            reminder1_at, reminder2_at
        FROM orders ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
@@ -153,7 +154,13 @@ async function stats() {
        FROM orders WHERE paid_at IS NOT NULL
       GROUP BY 1 ORDER BY 1 DESC LIMIT 60`
   );
-  return { byStatus: byStatus.rows, byDay: byDay.rows };
+  const rec = await query(
+    `SELECT count(*) FILTER (WHERE reminder1_at IS NOT NULL)::int AS sent,
+            count(*) FILTER (WHERE reminder1_at IS NOT NULL AND paid_at IS NOT NULL)::int AS recovered,
+            COALESCE(sum(amount_cents) FILTER (WHERE reminder1_at IS NOT NULL AND paid_at IS NOT NULL), 0)::int AS cents
+       FROM orders`
+  );
+  return { byStatus: byStatus.rows, byDay: byDay.rows, reminders: rec.rows[0] };
 }
 
 async function deleteOrder(id) {
@@ -196,6 +203,11 @@ async function setSettings(patch) {
 async function ensureSchema() {
   await query('ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_design_check');
   await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code text');
+  // Recordatorios de compra sin terminar (recordatorios.js)
+  await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder1_at timestamptz');
+  await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS reminder2_at timestamptz');
+  // Quien pide no recibir más recordatorios. Se guarda el hash del correo, no el correo.
+  await query('CREATE TABLE IF NOT EXISTS reminder_optouts (email_hash text PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now())');
 }
 
 // Veces que un correo ha usado un código. Cuentan las órdenes pagadas o en curso; las

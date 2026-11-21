@@ -16,7 +16,7 @@ const DESIGN_NAMES = {
   cascanueces: 'El cascanueces',
 };
 
-async function send({ to, subject, html }) {
+async function send({ to, subject, html, headers }) {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.log(`✉️  (sin RESEND_API_KEY) correo no enviado: "${subject}"`);
@@ -34,6 +34,7 @@ async function send({ to, subject, html }) {
         ...(process.env.EMAIL_REPLY_TO ? { reply_to: process.env.EMAIL_REPLY_TO } : {}),
         subject,
         html,
+        ...(headers ? { headers } : {}),
       }),
     });
     if (!res.ok) console.error(`✉️  Resend respondió ${res.status} para "${subject}"`);
@@ -46,7 +47,7 @@ async function send({ to, subject, html }) {
 
 // footer: texto al pie. Las alertas internas usan uno propio (no son de un pedido del cliente).
 function layout(title, bodyHtml, footer = 'Recibes este correo porque hiciste un pedido en CartaParaSanta.com. Para pedir que borremos los datos de tu pedido, responde a este correo.') {
-  return `<!doctype html><html lang="es"><body style="margin:0;background:#FBF7EF;font-family:Arial,Helvetica,sans-serif;color:#1F2A24">
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#FBF7EF;font-family:Arial,Helvetica,sans-serif;color:#1F2A24">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #EADFC8;border-radius:16px">
 <tr><td style="background:#0F3324;color:#FBF7EF;padding:20px 28px;border-radius:16px 16px 0 0;font-family:Georgia,serif;font-size:20px;font-weight:bold">CartaParaSanta<span style="color:#E2C27A">.com</span></td></tr>
@@ -105,6 +106,35 @@ function orderRefunded(order) {
 }
 
 // Alerta interna: sin datos personales del niño, solo lo necesario para encontrar la orden.
+// Recordatorio de compra sin terminar (recordatorios.js). n = 1 (a la hora) o 2 (a las 20 h).
+function abandonedReminder(order, n, { resumeUrl, optOutUrl, priceCents, deadline }) {
+  const who = order.child_name ? esc(order.child_name) : 'tu niño o niña';
+  const hola = order.buyer_name ? esc(String(order.buyer_name).split(' ')[0]) : '';
+  const when = dateEs(deadline);
+  const subject = n === 1 ? 'Tu carta a Santa está casi lista 🎅' : 'Última llamada del Polo Norte: tu carta se borra pronto';
+  const title = n === 1 ? 'Tu carta está casi lista' : 'Tu carta se borra en unas horas';
+  const intro = n === 1
+    ? `Los duendes encontraron la carta de <strong>${who}</strong> en el buzón, pero le falta el último paso para salir hacia el Polo Norte.`
+    : `La carta de <strong>${who}</strong> sigue esperando en el buzón, pero por privacidad la guardamos solo 24 horas y se borra en unas horas. Si todavía quieres que Santa la reciba, aún estás a tiempo.`;
+  const btn = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0"><tr><td style="background:#A53328;border-radius:999px">
+<a href="${esc(resumeUrl)}" style="display:inline-block;padding:14px 26px;color:#FFFFFF;font-weight:bold;font-size:16px;text-decoration:none">Terminar mi envío al Polo Norte</a></td></tr></table>`;
+  return send({
+    to: order.buyer_email,
+    subject,
+    headers: { 'List-Unsubscribe': `<${optOutUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+    html: layout(title, `
+<p style="font-size:16px;line-height:1.6">¡Hola${hola ? ', ' + hola : ''}! ${intro}</p>
+<table role="presentation" cellpadding="6" style="font-size:15px;margin:8px 0">
+<tr><td style="color:#5A645F">Diseño</td><td>${esc(DESIGN_NAMES[order.design] || order.design)}</td></tr>
+<tr><td style="color:#5A645F">Total</td><td><strong>${money(priceCents)}</strong> (envío e IVU incluidos)</td></tr>
+</table>
+${btn}
+<p style="font-size:15px;line-height:1.6">${when ? `Para que llegue antes de Navidad, termina tu pedido antes del <strong>${esc(when)}</strong>. ` : ''}Tus datos ya están guardados: no tienes que escribir nada otra vez.</p>
+<p style="font-size:15px;line-height:1.6">¿Tuviste algún problema con el pago? Responde a este correo y te ayudamos.</p>`,
+      `Te escribimos porque empezaste un pedido en CartaParaSanta.com y no se completó el pago. Si no lo terminas, la carta y tus datos se borran solos a las 24 horas. <a href="${esc(optOutUrl)}" style="color:#5A645F">No quiero más recordatorios</a>.<br>CartaParaSanta.com · Urb. Victor Rojas 1, 500 Calle Adjuntas, Arecibo, PR 00612`),
+  });
+}
+
 function alert(subject, order, detail = '') {
   const to = process.env.ALERT_EMAIL;
   if (!to) {
@@ -118,4 +148,4 @@ function alert(subject, order, detail = '') {
   });
 }
 
-module.exports = { orderConfirmation, orderMailed, orderRefunded, alert, DESIGN_NAMES };
+module.exports = { orderConfirmation, orderMailed, orderRefunded, abandonedReminder, alert, DESIGN_NAMES };
