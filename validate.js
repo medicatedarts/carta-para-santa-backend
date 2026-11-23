@@ -159,6 +159,7 @@ function validateCheckout(body) {
   }
 
   return {
+    lang: b.lang === 'en' ? 'en' : 'es',
     letters,
     letter: letters[0],
     buyer: { name: buyerName, email: buyerEmail },

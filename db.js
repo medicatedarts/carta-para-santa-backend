@@ -33,18 +33,18 @@ async function insertOrder(client, o) {
     try {
       const { rows } = await client.query(
         `INSERT INTO orders (
-           id, group_id, letter_index,
+           id, group_id, letter_index, lang,
            order_number, status, design, greeting, child_name, child_age, message, gifts, farewell, signature,
            buyer_name, buyer_email, consent_at, consent_ip,
            ship_name, ship_line1, ship_line2, ship_city, ship_state, ship_zip, ship_country,
            review_reason, amount_cents)
-         VALUES ($22,$23,$24,$1,'pending_payment',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         VALUES ($22,$23,$24,$25,$1,'pending_payment',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
          RETURNING *`,
         [
           newOrderNumber(), o.design, o.greeting, o.childName, o.childAge, o.message, JSON.stringify(o.gifts),
           o.farewell, o.signature, o.buyerName, o.buyerEmail, o.consentIp,
           o.ship.name, o.ship.line1, o.ship.line2, o.ship.city, o.ship.state, o.ship.zip, o.ship.country,
-          o.reviewReason, o.amountCents, o.id, o.groupId, o.letterIndex || 0,
+          o.reviewReason, o.amountCents, o.id, o.groupId, o.letterIndex || 0, o.lang === 'en' ? 'en' : 'es',
         ]
       );
       await client.query('RELEASE SAVEPOINT ins');
@@ -211,7 +211,7 @@ async function listOrders({ status, q, limit = 50, offset = 0 }) {
   const { rows } = await query(
     `SELECT id, order_number, status, design, child_name, buyer_email, ship_name, ship_city, ship_state,
             amount_cents, review_reason, error, created_at, paid_at, mailed_at, lob_expected_delivery,
-            reminder1_at, reminder2_at, group_id, letter_index,
+            reminder1_at, reminder2_at, group_id, letter_index, lang,
             (SELECT count(*) FROM orders g WHERE g.group_id = orders.group_id)::int AS group_size
        FROM orders ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
       ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -243,7 +243,7 @@ async function deleteOrder(id) {
 }
 
 // ---------- settings (lo que se edita desde el panel) ----------
-const SETTING_KEYS = ['price_cents', 'extra_price_cents', 'mailbox_open', 'deadline_recommended', 'mailbox_close_date'];
+const SETTING_KEYS = ['price_cents', 'extra_price_cents', 'price_cents_en', 'extra_price_cents_en', 'mailbox_open', 'deadline_recommended', 'mailbox_close_date'];
 
 async function getSettings() {
   const { rows } = await query('SELECT key, value FROM settings');
@@ -252,6 +252,9 @@ async function getSettings() {
     priceCents: Number(s.price_cents ?? process.env.LETTER_PRICE_CENTS ?? 0),
     // Precio de cada carta adicional en la misma compra (combo de hermanitos).
     extraPriceCents: Number(s.extra_price_cents ?? process.env.EXTRA_LETTER_PRICE_CENTS ?? 399),
+    // Versión en inglés (ReplyFromSanta): precio propio, más alto que en español.
+    priceCentsEn: Number(s.price_cents_en ?? process.env.LETTER_PRICE_CENTS_EN ?? 999),
+    extraPriceCentsEn: Number(s.extra_price_cents_en ?? process.env.EXTRA_LETTER_PRICE_CENTS_EN ?? 499),
     mailboxOpen: s.mailbox_open ?? true,
     deadlineRecommended: s.deadline_recommended ?? process.env.DEADLINE_RECOMMENDED ?? null,
     mailboxCloseDate: s.mailbox_close_date ?? process.env.MAILBOX_CLOSE_DATE ?? null,
@@ -260,7 +263,7 @@ async function getSettings() {
 
 async function setSettings(patch) {
   const map = {
-    priceCents: 'price_cents', extraPriceCents: 'extra_price_cents', mailboxOpen: 'mailbox_open',
+    priceCents: 'price_cents', extraPriceCents: 'extra_price_cents', priceCentsEn: 'price_cents_en', extraPriceCentsEn: 'extra_price_cents_en', mailboxOpen: 'mailbox_open',
     deadlineRecommended: 'deadline_recommended', mailboxCloseDate: 'mailbox_close_date',
   };
   for (const [k, col] of Object.entries(map)) {
@@ -288,6 +291,8 @@ async function ensureSchema() {
   await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS group_id uuid');
   await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS letter_index smallint NOT NULL DEFAULT 0');
   await query('CREATE INDEX IF NOT EXISTS orders_group_idx ON orders (group_id)');
+  // Versión en inglés: cada orden guarda el idioma en que se hizo (carta, correos, enlaces).
+  await query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS lang text NOT NULL DEFAULT 'es'");
 }
 
 // Veces que un correo ha usado un código. Cuentan las órdenes pagadas o en curso; las

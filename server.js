@@ -16,6 +16,7 @@ const Stripe = require('stripe');
 const db = require('./db');
 const { checkPromo } = require('./promo');
 const { validateCheckout, maxLetters } = require('./validate');
+const { translateErrors, langOf } = require('./i18n');
 const { checkContent } = require('./contentFilter');
 const { checkAddress } = require('./addressVerify');
 const { buildPrintHtml } = require('./printTemplate');
@@ -31,6 +32,10 @@ const recordatorios = require('./recordatorios');
 
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5500').replace(/\/$/, '');
+// Versión en inglés (ReplyFromSanta): mismo backend, otra web. Sin la variable, las órdenes en
+// inglés vuelven a la web en español (mejor que a ninguna).
+const FRONTEND_URL_EN = (process.env.FRONTEND_URL_EN || FRONTEND_URL).replace(/\/$/, '');
+const frontendFor = (lang) => (lang === 'en' ? FRONTEND_URL_EN : FRONTEND_URL);
 
 for (const key of ['DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'LOB_API_KEY', 'ADMIN_TOKEN']) {
   if (!process.env[key]) console.warn(`⚠️  ${key} no está configurada`);
@@ -54,7 +59,7 @@ app.use((_req, res, next) => {
   next();
 });
 
-const origins = (process.env.CORS_ORIGINS || FRONTEND_URL).split(',').map((s) => s.trim()).filter(Boolean);
+const origins = (process.env.CORS_ORIGINS || [FRONTEND_URL, FRONTEND_URL_EN].join(',')).split(',').map((s) => s.trim()).filter(Boolean);
 app.use(cors({ origin: origins }));
 
 // Fuentes para la impresión (Lob las descarga desde aquí si están en fonts/).
@@ -137,7 +142,7 @@ app.post('/api/webhook/stripe', express.raw({ type: 'application/json' }), async
           userAgent: md.ua,
           valueCents: session.amount_total,
           currency: session.currency,
-          sourceUrl: `${FRONTEND_URL}/gracias.html`,
+          sourceUrl: `${frontendFor(order.lang)}/gracias.html`,
           label: order.order_number,
         });
       }
@@ -188,6 +193,8 @@ app.post('/api/webhook/lob', express.raw({ type: 'application/json' }), async (r
 });
 
 app.use(express.json({ limit: '50kb' }));
+// Páginas en inglés: los mensajes de error salen traducidos (i18n.js).
+app.use(['/api/config', '/api/promo', '/api/checkout', '/api/order'], translateErrors);
 
 // ---------------------------------------------------------------------------
 // Límite simple de peticiones por IP (sin dependencias): 20 checkouts cada 15 min.
@@ -214,10 +221,12 @@ setInterval(() => {
 // ---------------------------------------------------------------------------
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-app.get('/api/config', async (_req, res) => {
+app.get('/api/config', async (req, res) => {
   try {
     const s = await db.getSettings();
-    res.json({ ...s, maxLetters: maxLetters(), currency: process.env.STRIPE_CURRENCY || 'usd', taxMode: process.env.TAX_MODE || 'included' });
+    // Cada web ve su propio precio: priceCents / extraPriceCents ya vienen en su idioma.
+    const p = pricesFor(s, req.lang);
+    res.json({ ...s, priceCents: p.first, extraPriceCents: p.extra, lang: req.lang, maxLetters: maxLetters(), currency: process.env.STRIPE_CURRENCY || 'usd', taxMode: process.env.TAX_MODE || 'included' });
   } catch (err) {
     console.error('Error leyendo la configuración:', err.message);
     res.status(500).json({ error: 'No se pudo leer la configuración.' });
@@ -232,7 +241,7 @@ app.post('/api/promo', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       return res.status(400).json({ error: 'Escribe primero el correo del adulto.', code: 'promo_email' });
     }
-    const prices = letterPrices(settings, req.body.letters);
+    const prices = letterPrices(settings, req.body.letters, req.lang);
     const r = await checkPromo(stripe, req.body.code, email, prices);
     if (!r.ok) return res.status(400).json({ error: r.message, code: r.code });
     res.json({ code: r.code, priceCents: prices.reduce((a, b) => a + b, 0), finalCents: r.finalCents });
@@ -244,10 +253,15 @@ app.post('/api/promo', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
 
 // Precio de lista de cada carta de una compra: la primera al precio normal y las demás
 // (hermanitos) al precio de carta adicional. Nunca más caro que la primera.
-function letterPrices(settings, count) {
+function pricesFor(settings, lang) {
+  const first = lang === 'en' ? settings.priceCentsEn : settings.priceCents;
+  const extraRaw = lang === 'en' ? settings.extraPriceCentsEn : settings.extraPriceCents;
+  return { first, extra: Math.min(extraRaw > 0 ? extraRaw : first, first) };
+}
+function letterPrices(settings, count, lang = 'es') {
   const n = Math.min(Math.max(parseInt(count, 10) || 1, 1), maxLetters());
-  const extra = Math.min(settings.extraPriceCents > 0 ? settings.extraPriceCents : settings.priceCents, settings.priceCents);
-  return Array.from({ length: n }, (_, i) => (i === 0 ? settings.priceCents : extra));
+  const { first, extra } = pricesFor(settings, lang);
+  return Array.from({ length: n }, (_, i) => (i === 0 ? first : extra));
 }
 
 // Sesión de pago de Stripe para una orden ya creada. La usan el checkout y el enlace de
@@ -257,8 +271,11 @@ function letterPrices(settings, count) {
 function createStripeSession(orders, { prices, promo = null, metaMetadata = {}, expiresAt } = {}) {
   const order = orders[0];
   const many = orders.length > 1;
+  const en = order.lang === 'en';
+  const site = frontendFor(order.lang);
   return stripe.checkout.sessions.create({
     mode: 'payment',
+    locale: en ? 'en' : 'es',
     payment_method_types: ['card'],
     // El código se aplica desde nuestro formulario (promo.js), no en la página de Stripe,
     // para poder limitar los usos por correo.
@@ -272,10 +289,10 @@ function createStripeSession(orders, { prices, promo = null, metaMetadata = {}, 
         currency: process.env.STRIPE_CURRENCY || 'usd',
         unit_amount: prices[i],
         product_data: {
-          name: i === 0
-            ? 'Carta de respuesta de Santa — impresa y enviada por correo'
-            : 'Carta adicional para hermanito — impresa y enviada por correo',
-          description: `Para: ${o.ship_name} · Orden ${o.order_number}`,
+          name: en
+            ? (i === 0 ? "Santa's reply letter — printed and mailed" : 'Extra letter for a sibling — printed and mailed')
+            : (i === 0 ? 'Carta de respuesta de Santa — impresa y enviada por correo' : 'Carta adicional para hermanito — impresa y enviada por correo'),
+          description: en ? `For: ${o.ship_name} · Order ${o.order_number}` : `Para: ${o.ship_name} · Orden ${o.order_number}`,
         },
       },
       quantity: 1,
@@ -286,8 +303,8 @@ function createStripeSession(orders, { prices, promo = null, metaMetadata = {}, 
       ...metaMetadata,
     },
     payment_intent_data: { metadata: { orderId: order.id, orderNumber: order.order_number, ...(many ? { letters: String(orders.length) } : {}) } },
-    success_url: `${FRONTEND_URL}/gracias.html?order=${order.id}`,
-    cancel_url: `${FRONTEND_URL}/enviar.html?cancelado=1`,
+    success_url: `${site}/gracias.html?order=${order.id}`,
+    cancel_url: `${site}/enviar.html?cancelado=1`,
   });
 }
 
@@ -306,14 +323,15 @@ app.get('/r/pagar/:id', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
     // Toda la compra (combo de hermanitos): se paga junta, igual que la primera vez.
     const group = await db.getGroup(id);
     const order = group[0];
+    const site = frontendFor(order && order.lang);
     if (!order || order.id !== id || order.purged_at || order.status === 'cancelled' || order.status === 'refunded') {
-      return res.redirect(303, `${FRONTEND_URL}/carta.html`);
+      return res.redirect(303, `${site}/carta.html`);
     }
-    if (group.some((o) => o.status !== 'pending_payment')) return res.redirect(303, `${FRONTEND_URL}/gracias.html?order=${order.id}`);
+    if (group.some((o) => o.status !== 'pending_payment')) return res.redirect(303, `${site}/gracias.html?order=${order.id}`);
 
     if (order.stripe_session_id) {
       const prev = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
-      if (prev.status === 'complete') return res.redirect(303, `${FRONTEND_URL}/gracias.html?order=${order.id}`);
+      if (prev.status === 'complete') return res.redirect(303, `${site}/gracias.html?order=${order.id}`);
       if (prev.status === 'open') await stripe.checkout.sessions.expire(prev.id);
     }
 
@@ -321,7 +339,7 @@ app.get('/r/pagar/:id', rateLimit(30, 15 * 60 * 1000), async (req, res) => {
     // una orden que ya no existe. Stripe pide al menos 30 minutos.
     const purgeAt = Math.floor(new Date(order.created_at).getTime() / 1000) + 25 * 3600 - 10 * 60;
     const now = Math.floor(Date.now() / 1000);
-    if (purgeAt - now < 31 * 60) return res.redirect(303, `${FRONTEND_URL}/carta.html`);
+    if (purgeAt - now < 31 * 60) return res.redirect(303, `${site}/carta.html`);
     const expiresAt = Math.min(purgeAt, now + 23 * 3600);
 
     // Los recordatorios nunca van a órdenes con código, así que el precio guardado es el de lista.
@@ -351,7 +369,8 @@ app.post('/r/baja/:hash', express.urlencoded({ extended: false }), async (req, r
   if (!printUrl.verify(req.path, req.query.exp, req.query.sig)) return res.status(403).type('html').send(simplePage('Enlace vencido', 'Este enlace ya no es válido.'));
   try {
     await recordatorios.optOut(req.params.hash);
-    res.type('html').send(simplePage('Listo', 'No te enviaremos más recordatorios. ¡Feliz Navidad! 🎄'));
+    // La baja es por correo (sirve para ambos idiomas): el mensaje va en los dos.
+    res.type('html').send(simplePage('Listo · Done', 'No te enviaremos más recordatorios. ¡Feliz Navidad! 🎄 — We won\'t send you any more reminders. Merry Christmas!'));
   } catch (err) {
     console.error('Error registrando la baja:', err.message);
     res.status(500).type('html').send(simplePage('Algo salió mal', 'No pudimos registrar la baja. Responde a nuestro correo y te quitamos a mano.'));
@@ -376,7 +395,8 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
     if (!settings.mailboxOpen) {
       return res.status(400).json({ error: 'El buzón del Polo Norte cerró por este año. ¡Gracias por escribirle a Santa!', code: 'mailbox_closed' });
     }
-    if (!settings.priceCents || settings.priceCents < 50) {
+    const lang = langOf(req.body && req.body.lang);
+    if (!pricesFor(settings, lang).first || pricesFor(settings, lang).first < 50) {
       return res.status(500).json({ error: 'El precio no está configurado todavía.', code: 'config' });
     }
 
@@ -396,7 +416,7 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
     }
 
     // Precio de lista de cada carta: la primera normal y las demás al precio de hermanito.
-    const prices = letterPrices(settings, data.letters.length);
+    const prices = letterPrices(settings, data.letters.length, data.lang);
 
     // Código de descuento (opcional): se valida aquí, con el límite por correo (cada carta cuenta).
     let promo = null;
@@ -415,6 +435,7 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
     // Una orden por carta, cada una con su nombre en el sobre y su parte del precio.
     const orders = await db.createOrderGroup(data.letters.map((l, i) => ({
       ...l,
+      lang: data.lang,
       buyerName: data.buyer.name,
       buyerEmail: data.buyer.email,
       consentIp: req.ip || null,
@@ -453,7 +474,7 @@ app.post('/api/checkout', rateLimit(20, 15 * 60 * 1000), async (req, res) => {
         userAgent: attribution.ua,
         valueCents: totalCents,
         currency: process.env.STRIPE_CURRENCY || 'usd',
-        sourceUrl: `${FRONTEND_URL}/enviar.html`,
+        sourceUrl: `${frontendFor(data.lang)}/enviar.html`,
         label: order.order_number,
       });
     }
@@ -686,6 +707,8 @@ admin.get('/check', async (_req, res) => {
   const settings = await db.getSettings();
   add('Sitio', 'Buzón', settings.mailboxOpen ? 'ok' : 'warn', settings.mailboxOpen ? 'abierto' : 'cerrado');
   add('Sitio', 'Precio', settings.priceCents >= 50 ? 'ok' : 'error', settings.priceCents ? `${(settings.priceCents / 100).toFixed(2)} USD` : 'falta');
+  add('Sitio', 'Precio en inglés', settings.priceCentsEn >= 50 ? 'ok' : 'warn', `${(settings.priceCentsEn / 100).toFixed(2)} USD · hermanito ${(settings.extraPriceCentsEn / 100).toFixed(2)} USD`);
+  add('Sitio', 'FRONTEND_URL_EN', /^https:\/\//.test(process.env.FRONTEND_URL_EN || '') ? 'ok' : 'warn', process.env.FRONTEND_URL_EN || 'falta (las órdenes en inglés vuelven a la web en español)');
   add('Sitio', 'Carta adicional (hermanitos)', settings.extraPriceCents >= 50 && settings.extraPriceCents <= settings.priceCents ? 'ok' : 'warn',
     `${(settings.extraPriceCents / 100).toFixed(2)} USD · hasta ${maxLetters()} cartas por compra`);
 
@@ -699,6 +722,12 @@ admin.patch('/settings', async (req, res) => {
     const n = Number(b.priceCents);
     if (!Number.isInteger(n) || n < 50) return res.status(400).json({ error: 'Precio inválido (en centavos, mínimo 50).' });
     patch.priceCents = n;
+  }
+  for (const k of ['priceCentsEn', 'extraPriceCentsEn']) {
+    if (b[k] === undefined) continue;
+    const n = Number(b[k]);
+    if (!Number.isInteger(n) || n < 50) return res.status(400).json({ error: `${k}: precio inválido (en centavos, mínimo 50).` });
+    patch[k] = n;
   }
   if (b.extraPriceCents !== undefined) {
     const n = Number(b.extraPriceCents);

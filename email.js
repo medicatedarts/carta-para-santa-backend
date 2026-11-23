@@ -16,7 +16,7 @@ const DESIGN_NAMES = {
   cascanueces: 'El cascanueces',
 };
 
-async function send({ to, subject, html, headers }) {
+async function send({ to, subject, html, headers, lang }) {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.log(`✉️  (sin RESEND_API_KEY) correo no enviado: "${subject}"`);
@@ -27,7 +27,9 @@ async function send({ to, subject, html, headers }) {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'Taller de Santa <hola@cartaparasanta.com>',
+        from: lang === 'en'
+          ? (process.env.EMAIL_FROM_EN || "Santa's Workshop <hola@cartaparasanta.com>")
+          : (process.env.EMAIL_FROM || 'Taller de Santa <hola@cartaparasanta.com>'),
         to: Array.isArray(to) ? to : [to],
         // Los correos salen de un subdominio que solo envía; las respuestas de los
         // padres van a una dirección que sí recibe (y se reenvía a tu Gmail).
@@ -46,11 +48,11 @@ async function send({ to, subject, html, headers }) {
 }
 
 // footer: texto al pie. Las alertas internas usan uno propio (no son de un pedido del cliente).
-function layout(title, bodyHtml, footer = 'Recibes este correo porque hiciste un pedido en CartaParaSanta.com. Para pedir que borremos los datos de tu pedido, responde a este correo.') {
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#FBF7EF;font-family:Arial,Helvetica,sans-serif;color:#1F2A24">
+function layout(title, bodyHtml, footer = 'Recibes este correo porque hiciste un pedido en CartaParaSanta.com. Para pedir que borremos los datos de tu pedido, responde a este correo.', brand = ['CartaParaSanta', '.com'], lang = 'es') {
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#FBF7EF;font-family:Arial,Helvetica,sans-serif;color:#1F2A24">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #EADFC8;border-radius:16px">
-<tr><td style="background:#0F3324;color:#FBF7EF;padding:20px 28px;border-radius:16px 16px 0 0;font-family:Georgia,serif;font-size:20px;font-weight:bold">CartaParaSanta<span style="color:#E2C27A">.com</span></td></tr>
+<tr><td style="background:#0F3324;color:#FBF7EF;padding:20px 28px;border-radius:16px 16px 0 0;font-family:Georgia,serif;font-size:20px;font-weight:bold">${brand[0]}<span style="color:#E2C27A">${brand[1]}</span></td></tr>
 <tr><td style="padding:28px">
 <h1 style="margin:0 0 14px;font-family:Georgia,serif;font-size:24px;color:#0F3324">${title}</h1>
 ${bodyHtml}
@@ -70,6 +72,7 @@ const dateEs = (d) => {
 // siempre se manda UN solo correo con todas las cartas.
 function orderConfirmation(orderOrList) {
   const orders = Array.isArray(orderOrList) ? orderOrList : [orderOrList];
+  if (orders[0] && orders[0].lang === 'en') return en.orderConfirmation(orders);
   const order = orders[0];
   const many = orders.length > 1;
   const total = orders.reduce((sum, o) => sum + (o.amount_cents || 0), 0);
@@ -101,6 +104,7 @@ ${rows}
 }
 
 function orderMailed(order) {
+  if (order.lang === 'en') return en.orderMailed(order);
   const when = dateEs(order.lob_expected_delivery);
   return send({
     to: order.buyer_email,
@@ -112,6 +116,7 @@ function orderMailed(order) {
 }
 
 function orderRefunded(order) {
+  if (order.lang === 'en') return en.orderRefunded(order);
   return send({
     to: order.buyer_email,
     subject: `Tu pedido ${order.order_number} fue cancelado`,
@@ -122,7 +127,9 @@ function orderRefunded(order) {
 
 // Alerta interna: sin datos personales del niño, solo lo necesario para encontrar la orden.
 // Recordatorio de compra sin terminar (recordatorios.js). n = 1 (a la hora) o 2 (a las 20 h).
-function abandonedReminder(order, n, { resumeUrl, optOutUrl, priceCents, deadline, letters = 1 }) {
+function abandonedReminder(order, n, opts) {
+  if (order.lang === 'en') return en.abandonedReminder(order, n, opts);
+  const { resumeUrl, optOutUrl, priceCents, deadline, letters = 1 } = opts;
   const first = order.child_name ? esc(order.child_name) : 'tu niño o niña';
   // Combo de hermanitos: "la carta de Sofía y 1 más".
   const who = letters > 1 ? `${first}</strong> y <strong>${letters - 1} ${letters === 2 ? 'nene' : 'nenes'} más` : first;
@@ -166,4 +173,103 @@ function alert(subject, order, detail = '') {
   });
 }
 
-module.exports = { orderConfirmation, orderMailed, orderRefunded, abandonedReminder, alert, DESIGN_NAMES };
+// ---------------------------------------------------------------------------
+// Inglés (ReplyFromSanta). Mismos correos, mismo diseño, otro idioma y otra marca.
+// ---------------------------------------------------------------------------
+const BRAND_EN = (process.env.BRAND_EN || 'ReplyFromSanta.com').replace(/\.com$/i, '');
+const DESIGN_NAMES_EN = {
+  clasica: 'Classic airmail', taller: "Elves' workshop", estrellas: 'Starry night', polonorte: 'North Pole sky',
+  juguetes: 'Watercolor toys', duendes: 'Elves and reindeer', dulces: 'Christmas sweets', cascanueces: 'The nutcracker',
+};
+const dateEn = (d) => {
+  if (!d) return '';
+  const x = new Date(String(d).slice(0, 10) + 'T12:00:00Z');
+  return Number.isNaN(x.getTime()) ? '' : x.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+};
+const layoutEn = (title, body, footer) => layout(title, body,
+  footer || `You are receiving this email because you placed an order at ${BRAND_EN}.com. To ask us to delete your order data, just reply to this email.`,
+  [BRAND_EN, '.com'], 'en');
+
+const en = {
+  orderConfirmation(orders) {
+    const order = orders[0];
+    const many = orders.length > 1;
+    const total = orders.reduce((sum, o) => sum + (o.amount_cents || 0), 0);
+    const numbers = orders.map((o) => o.order_number).join(', ');
+    const address = `${esc(order.ship_line1)}${order.ship_line2 ? '<br>' + esc(order.ship_line2) : ''}<br>${esc(order.ship_city)}, ${esc(order.ship_state)} ${esc(order.ship_zip)}`;
+    const rows = many
+      ? `<tr><td style="color:#5A645F;vertical-align:top">Letters</td><td>${orders.map((o, i) =>
+          `<strong>${i + 1}. ${esc(o.ship_name)}</strong> · ${esc(DESIGN_NAMES_EN[o.design] || o.design)}<br><span style="color:#5A645F;font-size:13px">Order ${esc(o.order_number)}</span>`).join('<br>')}</td></tr>
+<tr><td style="color:#5A645F;vertical-align:top">Address</td><td>${address}</td></tr>`
+      : `<tr><td style="color:#5A645F">Order</td><td><strong>${esc(order.order_number)}</strong></td></tr>
+<tr><td style="color:#5A645F">Design</td><td>${esc(DESIGN_NAMES_EN[order.design] || order.design)}</td></tr>
+<tr><td style="color:#5A645F">For</td><td>${esc(order.ship_name)}<br>${address}</td></tr>`;
+    return send({
+      lang: 'en',
+      to: order.buyer_email,
+      subject: many ? `Your ${orders.length} letters reached the North Pole! (${numbers})` : `Your letter reached the North Pole! (${order.order_number})`,
+      html: layoutEn(many ? `Ho ho ho! Your ${orders.length} letters reached the North Pole` : 'Ho ho ho! Your letter reached the North Pole', `
+<p style="font-size:16px;line-height:1.6">Hi ${esc(order.buyer_name)}, we received your order and payment. The elves are already preparing Santa's ${many ? 'replies' : 'reply'}.</p>
+<table role="presentation" cellpadding="6" style="font-size:15px;margin:12px 0">
+${rows}
+<tr><td style="color:#5A645F">Total</td><td>${total ? money(total) : 'Free (discount code)'}</td></tr>
+</table>
+<p style="font-size:15px;line-height:1.6">${many
+  ? 'Each child gets their own white window envelope with Santa\'s reply and a copy of their letter. The envelopes may arrive on different days. We will email you as each one goes out.'
+  : 'We will email you again when the letter leaves the North Pole. It arrives by mail in a white window envelope, with Santa\'s reply and a copy of the original letter.'}</p>
+<p style="font-size:13px;line-height:1.6;color:#5A645F">To make the ${many ? 'letters' : 'letter'} we keep the child's name, age, letter text and wish list. We use them only to print and delete them after delivery, as described in our privacy policy.</p>`),
+    });
+  },
+  orderMailed(order) {
+    const when = dateEn(order.lob_expected_delivery);
+    return send({
+      lang: 'en',
+      to: order.buyer_email,
+      subject: "Santa's reply is on its way",
+      html: layoutEn('The letter has left the North Pole!', `
+<p style="font-size:16px;line-height:1.6">Santa's reply for ${esc(order.ship_name)} (order ${esc(order.order_number)}) is now in the mail.${when ? ` It should arrive around <strong>${esc(when)}</strong>.` : ''}</p>
+<p style="font-size:15px;line-height:1.6">Look for a white window envelope: the magic is inside.</p>`),
+    });
+  },
+  orderRefunded(order) {
+    return send({
+      lang: 'en',
+      to: order.buyer_email,
+      subject: `Your order ${order.order_number} was canceled`,
+      html: layoutEn('Order canceled', `
+<p style="font-size:16px;line-height:1.6">We canceled order ${esc(order.order_number)} and refunded ${money(order.amount_cents)} to your card. The refund can take 5 to 10 days to show up.</p>`),
+    });
+  },
+  abandonedReminder(order, n, { resumeUrl, optOutUrl, priceCents, deadline, letters = 1 }) {
+    const first = order.child_name ? esc(order.child_name) : 'your child';
+    const who = letters > 1 ? `${first}</strong> and <strong>${letters - 1} more` : first;
+    const hi = order.buyer_name ? esc(String(order.buyer_name).split(' ')[0]) : '';
+    const when = dateEn(deadline);
+    const plural = letters > 1;
+    const subject = n === 1 ? 'Your letter to Santa is almost ready 🎅' : 'Last call from the North Pole: your letter will be deleted soon';
+    const title = n === 1 ? 'Your letter is almost ready' : 'Your letter will be deleted in a few hours';
+    const intro = n === 1
+      ? `The elves found the ${plural ? 'letters' : 'letter'} from <strong>${who}</strong> in the mailbox, but ${plural ? 'they still need' : 'it still needs'} one last step to fly to the North Pole.`
+      : `The ${plural ? 'letters' : 'letter'} from <strong>${who}</strong> ${plural ? 'are' : 'is'} still waiting in the mailbox, but for privacy we only keep ${plural ? 'them' : 'it'} for 24 hours. If you still want Santa to get ${plural ? 'them' : 'it'}, there is still time.`;
+    const btn = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0"><tr><td style="background:#A53328;border-radius:999px">
+<a href="${esc(resumeUrl)}" style="display:inline-block;padding:14px 26px;color:#FFFFFF;font-weight:bold;font-size:16px;text-decoration:none">Finish sending to the North Pole</a></td></tr></table>`;
+    return send({
+      lang: 'en',
+      to: order.buyer_email,
+      subject,
+      headers: { 'List-Unsubscribe': `<${optOutUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+      html: layoutEn(title, `
+<p style="font-size:16px;line-height:1.6">Hi${hi ? ' ' + hi : ''}! ${intro}</p>
+<table role="presentation" cellpadding="6" style="font-size:15px;margin:8px 0">
+${plural ? `<tr><td style="color:#5A645F">Letters</td><td>${letters}</td></tr>` : `<tr><td style="color:#5A645F">Design</td><td>${esc(DESIGN_NAMES_EN[order.design] || order.design)}</td></tr>`}
+<tr><td style="color:#5A645F">Total</td><td><strong>${money(priceCents)}</strong> (shipping included)</td></tr>
+</table>
+${btn}
+<p style="font-size:15px;line-height:1.6">${when ? `To get it before Christmas, finish your order by <strong>${esc(when)}</strong>. ` : ''}Your details are saved: you don't have to type anything again.</p>
+<p style="font-size:15px;line-height:1.6">Had trouble with the payment? Reply to this email and we'll help.</p>`,
+        `We're writing because you started an order at ${BRAND_EN}.com and the payment wasn't completed. If you don't finish it, the letter and your details are deleted automatically after 24 hours. <a href="${esc(optOutUrl)}" style="color:#5A645F">No more reminders</a>.<br>${BRAND_EN}.com · Urb. Victor Rojas 1, 500 Calle Adjuntas, Arecibo, PR 00612`),
+    });
+  },
+};
+
+module.exports = { orderConfirmation, orderMailed, orderRefunded, abandonedReminder, alert, DESIGN_NAMES, DESIGN_NAMES_EN };

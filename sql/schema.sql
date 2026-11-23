@@ -85,3 +85,6 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS group_id uuid;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS letter_index smallint NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS orders_group_idx ON orders (group_id);
 INSERT INTO settings (key, value) VALUES ('extra_price_cents', '399') ON CONFLICT (key) DO NOTHING;
+-- Versión en inglés (23 nov 2026)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS lang text NOT NULL DEFAULT 'es';
+INSERT INTO settings (key, value) VALUES ('price_cents_en', '999'), ('extra_price_cents_en', '499') ON CONFLICT (key) DO NOTHING;

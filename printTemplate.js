@@ -18,6 +18,16 @@
 const path = require('path');
 const layout = require('./papeles/layout.json');
 const { buildSantaReply } = require('./santaReply');
+const fs = require('fs');
+
+// Versión en inglés: los fondos que llevan palabras en español (el logo del taller, "¡Feliz
+// Navidad!", el letrero del Polo Norte…) tienen una copia "-en.jpg" en papeles/fondos/. Si una
+// copia no existe, se usa la de siempre.
+function imageFor(image, order) {
+  if (order.lang !== 'en') return image;
+  const en = image.replace(/\.jpg$/, '-en.jpg');
+  return fs.existsSync(path.join(__dirname, 'papeles', 'fondos', en)) ? en : image;
+}
 
 function esc(str = '') {
   return String(str)
@@ -58,7 +68,7 @@ function santaPage(order, { preview = false, now } = {}, a) {
   const z = L.addressZone;
   return `
 <div class="page">
-  <img class="bg" src="${a.fondos}/${L.image}" alt="">
+  <img class="bg" src="${a.fondos}/${imageFor(L.image, order)}" alt="">
   ${preview ? `<div class="zone" style="${box(z)}">Lob imprime aquí remitente y destinatario</div>` : ''}
   <p class="santa-date" style="left:${L.date.x}in;top:${L.date.y}in;width:${L.date.w}in;color:${L.date.color}">${esc(r.date)}</p>
   <div class="abs santa-body" style="${box(L.textBox)}">
@@ -76,6 +86,12 @@ function santaPage(order, { preview = false, now } = {}, a) {
 // ---------------------------------------------------------------------------
 function introLine(order) {
   const name = (order.child_name || '').trim();
+  if (order.lang === 'en') {
+    if (name && order.child_age) return `My name is ${name} and I am ${order.child_age} years old.`;
+    if (name) return `My name is ${name}.`;
+    if (order.child_age) return `I am ${order.child_age} years old.`;
+    return '';
+  }
   if (name && order.child_age) return `Me llamo ${name} y tengo ${order.child_age} años.`;
   if (name) return `Me llamo ${name}.`;
   if (order.child_age) return `Tengo ${order.child_age} años.`;
@@ -166,10 +182,10 @@ function childPage(order, a) {
 
   const p = (txt, extra = '') => `<p style="margin:0;line-height:${lhPx}px;${extra}">${txt}</p>`;
   const body = [
-    `<div style="position:relative;height:${title.rows * lhPx}px"><p style="${greetStyle}">${esc(order.greeting || 'Querido Santa:')}</p></div>`,
+    `<div style="position:relative;height:${title.rows * lhPx}px"><p style="${greetStyle}">${esc(order.greeting || (order.lang === 'en' ? 'Dear Santa,' : 'Querido Santa:'))}</p></div>`,
     intro ? p(esc(intro)) : '',
     order.message ? p(esc(order.message), 'white-space:pre-wrap') : '',
-    gifts.length ? p('Esta es mi lista de regalos:') : '',
+    gifts.length ? p(order.lang === 'en' ? 'Here is my wish list:' : 'Esta es mi lista de regalos:') : '',
     ...gifts.map((g, i) => p(`${i + 1}.&nbsp;${esc(g)}`, 'padding-left:0.35in;text-indent:-0.22in')),
     order.farewell ? p(esc(order.farewell)) : '',
     p(esc(order.signature || order.child_name || ''), `color:${d.signColor};font-size:${r3(pt * 1.2)}pt`),
@@ -177,7 +193,7 @@ function childPage(order, a) {
 
   return `
 <div class="page">
-  <img class="bg" src="${a.fondos}/${d.image}" alt="">
+  <img class="bg" src="${a.fondos}/${imageFor(d.image, order)}" alt="">
   ${ruled.join('')}
   <div class="abs child-text" style="left:${left}px;top:${top}px;width:${width}px;height:${height}px;font-size:${pt}pt;color:${d.ink}">${body}</div>
 </div>`;
@@ -219,7 +235,7 @@ function css(a) {
 function buildPrintHtml(order, opts = {}) {
   const a = assetBase();
   return `<!doctype html>
-<html lang="es">
+<html lang="${order.lang === 'en' ? 'en' : 'es'}">
 <head>
 <meta charset="utf-8">
 <title>CartaParaSanta ${esc(order.order_number || '')}</title>

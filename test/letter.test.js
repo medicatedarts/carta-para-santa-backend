@@ -109,3 +109,24 @@ test('combo: el error dice qué carta tiene el problema y hay un máximo de cart
   const c = combo(); c.letters = Array(5).fill(c.letters[0]);
   assert.throws(() => validateCheckout(c), /hasta 4 cartas/);
 });
+
+// ---------- Versión en inglés ----------
+const { tr } = require('../i18n');
+
+test('inglés: la validación guarda el idioma y los errores se traducen', () => {
+  const b = base(); b.lang = 'en';
+  assert.strictEqual(validateCheckout(b).lang, 'en');
+  assert.strictEqual(validateCheckout(base()).lang, 'es');
+  assert.strictEqual(tr('en', 'Revisa el correo electrónico.'), 'Check the email address.');
+  assert.strictEqual(tr('en', 'Carta 2: Escribe un mensaje o al menos un regalo para Santa.'), 'Letter 2: Write a message or at least one gift for Santa.');
+  assert.strictEqual(tr('en', 'El mensaje es demasiado largo (máximo 700 caracteres).'), 'The message is too long (700 characters max).');
+  assert.strictEqual(tr('es', 'Revisa el correo electrónico.'), 'Revisa el correo electrónico.');
+});
+
+test('inglés: la respuesta de Santa sale en inglés con los regalos', () => {
+  const r = buildSantaReply({ id: 'x1', lang: 'en', child_name: 'Mia', child_age: 6, gifts: ['a red bike', 'paints', 'a book'] }, new Date('2026-12-01'));
+  assert.strictEqual(r.greeting, 'Dear Mia,');
+  assert.strictEqual(r.date, 'December 2026');
+  assert.match(r.paragraphs[2], /a red bike, paints, and a book/);
+  assert.match(r.ps, /^P\.S\./);
+});

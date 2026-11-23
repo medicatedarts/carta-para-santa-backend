@@ -78,6 +78,7 @@ function firstName(full) {
  * @returns {{ header, date, greeting, paragraphs: string[], farewell, signature, ps }}
  */
 function buildSantaReply(order, now = new Date()) {
+  if (order.lang === 'en') return buildSantaReplyEn(order, now);
   const seed = order.id;
   const name = (order.child_name || '').trim() || firstName(order.ship_name);
   const gifts = (Array.isArray(order.gifts) ? order.gifts : []).filter(Boolean).map(lowerFirst);
@@ -111,4 +112,80 @@ function buildSantaReply(order, now = new Date()) {
   };
 }
 
-module.exports = { buildSantaReply, joinEs, lowerFirst };
+// ---------- Inglés (ReplyFromSanta) ----------
+// Mismas partes y misma forma de escoger variantes que en español, para que dos hermanos
+// tampoco reciban la misma carta en inglés.
+const EN = {
+  OPENINGS: [
+    'Your letter made it all the way to the North Pole! I read it by the workshop fireplace with a mug of hot cocoa, and it made me smile from ear to ear.',
+    'What a joy to get your letter! One of my mail elves came running to bring it to me, and I read it right away, glasses on and paying close attention.',
+    'This morning, while the reindeer were having breakfast, your letter landed on my desk. I read it twice because I loved it so much.',
+  ],
+  AGE_LINES: [
+    '{edad} years old! You are growing up so fast, and it shows in how well you write.',
+    'The elves told me you are already {edad}. My, how big you are!',
+  ],
+  YEAR_LINES: [
+    'The elves tell me you have been trying really hard this year. That makes me very, very happy.',
+    'Here at the North Pole we always keep an eye on the boys and girls who try to be good, and your name came up again and again.',
+    'I know being good is not always easy, but I also know you try with all your heart. That is what matters most to me.',
+  ],
+  GIFTS_ONE: [
+    'I carefully wrote down what you asked for: {regalos}. I have already handed your list to the workshop elves so they can look at it with lots of love.',
+    'I saw that you asked for {regalos}. I put your letter in the special place where the elves go over Christmas wishes.',
+  ],
+  GIFTS_MANY: [
+    'I carefully wrote down your list: {regalos}. I have already handed it to the workshop elves so they can look at it with lots of love.',
+    'I read your wish list, with {regalos}, and the elves have already peeked at it! We keep it in the special place where we go over Christmas wishes.',
+  ],
+  NO_GIFTS: 'You did not ask for anything on your list, and that tells me you have a very generous heart. We will keep you close in our thoughts here at the workshop.',
+  ADVICE: [
+    'Until then, keep being kind, share with others and go to bed early on Christmas Eve.',
+    'Until then, remember to help out at home, give your family lots of hugs and go to sleep early on Christmas Eve.',
+    'I have a favor to ask: keep smiling, be kind to everyone and do not forget to go to bed early on Christmas Eve.',
+  ],
+  CLOSINGS: [
+    'Rudolph and the other reindeer send you a big hello.',
+    'Mrs. Claus and all the elves send you a great big hug.',
+    'The reindeer are practicing their flying and send you lots of greetings from the stable.',
+  ],
+};
+
+function joinEn(items) {
+  if (items.length <= 1) return items.join('');
+  if (items.length === 2) return items.join(' and ');
+  return items.slice(0, -1).join(', ') + ', and ' + items[items.length - 1];
+}
+
+function buildSantaReplyEn(order, now) {
+  const seed = order.id;
+  const name = (order.child_name || '').trim() || firstName(order.ship_name);
+  const gifts = (Array.isArray(order.gifts) ? order.gifts : []).filter(Boolean);
+  const p1 = [pick(EN.OPENINGS, seed, 'opening')];
+  if (order.child_age) p1.push(pick(EN.AGE_LINES, seed, 'age').replace('{edad}', order.child_age));
+  let giftsText;
+  if (gifts.length === 0) {
+    giftsText = EN.NO_GIFTS;
+  } else {
+    let list = joinEn(gifts.slice(0, 3));
+    if (gifts.length > 3) list = gifts.slice(0, 3).join(', ') + '… and everything else you asked for';
+    giftsText = pick(gifts.length === 1 ? EN.GIFTS_ONE : EN.GIFTS_MANY, seed, 'gifts').replace('{regalos}', list);
+  }
+  return {
+    header: "Santa's Workshop",
+    place: 'North Pole',
+    date: `December ${now.getFullYear()}`,
+    greeting: name ? `Dear ${name},` : 'Dear friend,',
+    paragraphs: [
+      p1.join(' '),
+      pick(EN.YEAR_LINES, seed, 'year'),
+      giftsText,
+      `${pick(EN.ADVICE, seed, 'advice')} ${pick(EN.CLOSINGS, seed, 'closing')}`,
+    ],
+    farewell: 'With love from the North Pole,',
+    signature: 'Santa Claus',
+    ps: 'P.S. Inside this envelope is a copy of the letter you wrote me. Keep it as a magical keepsake!',
+  };
+}
+
+module.exports = { buildSantaReply, joinEs, joinEn, lowerFirst };
