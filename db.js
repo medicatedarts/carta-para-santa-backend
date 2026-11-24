@@ -198,10 +198,14 @@ async function markPaid(id, payment) {
   return rows.find((o) => o.id === id) || rows[0] || null;
 }
 
-async function listOrders({ status, q, limit = 50, offset = 0 }) {
+// lang = 'es' | 'en' para ver solo las órdenes de un sitio (CartaParaSanta o ReplyFromSanta).
+function langOf(lang) { return lang === 'es' || lang === 'en' ? lang : null; }
+
+async function listOrders({ status, q, lang, limit = 50, offset = 0 }) {
   const where = [];
   const params = [];
   if (status) { params.push(status); where.push(`status = $${params.length}`); }
+  if (langOf(lang)) { params.push(langOf(lang)); where.push(`COALESCE(lang, 'es') = $${params.length}`); }
   if (q) {
     params.push(`%${q.toLowerCase()}%`);
     const p = `$${params.length}`;
@@ -220,19 +224,25 @@ async function listOrders({ status, q, limit = 50, offset = 0 }) {
   return rows;
 }
 
-async function stats() {
-  const byStatus = await query('SELECT status, count(*)::int AS n FROM orders GROUP BY status');
+async function stats({ lang } = {}) {
+  // Mismo filtro por sitio que listOrders; sin lang cuenta los dos sitios.
+  const l = langOf(lang);
+  const params = l ? [l] : [];
+  const and = l ? `AND COALESCE(lang, 'es') = $1` : '';
+  const byStatus = await query(`SELECT status, count(*)::int AS n FROM orders WHERE true ${and} GROUP BY status`, params);
   const byDay = await query(
     `SELECT to_char(date_trunc('day', paid_at AT TIME ZONE 'America/Puerto_Rico'), 'YYYY-MM-DD') AS day,
             count(*)::int AS orders, COALESCE(sum(amount_cents), 0)::int AS cents
-       FROM orders WHERE paid_at IS NOT NULL
-      GROUP BY 1 ORDER BY 1 DESC LIMIT 60`
+       FROM orders WHERE paid_at IS NOT NULL ${and}
+      GROUP BY 1 ORDER BY 1 DESC LIMIT 60`,
+    params
   );
   const rec = await query(
     `SELECT count(*) FILTER (WHERE reminder1_at IS NOT NULL)::int AS sent,
             count(*) FILTER (WHERE reminder1_at IS NOT NULL AND paid_at IS NOT NULL)::int AS recovered,
             COALESCE(sum(amount_cents) FILTER (WHERE reminder1_at IS NOT NULL AND paid_at IS NOT NULL), 0)::int AS cents
-       FROM orders`
+       FROM orders WHERE true ${and}`,
+    params
   );
   return { byStatus: byStatus.rows, byDay: byDay.rows, reminders: rec.rows[0] };
 }

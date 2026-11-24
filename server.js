@@ -555,7 +555,7 @@ for (const m of ['get', 'post', 'patch', 'delete']) {
 }
 
 admin.get('/orders', async (req, res) => {
-  res.json(await db.listOrders({ status: req.query.status, q: req.query.q, limit: req.query.limit, offset: req.query.offset }));
+  res.json(await db.listOrders({ status: req.query.status, q: req.query.q, lang: req.query.lang, limit: req.query.limit, offset: req.query.offset }));
 });
 
 admin.get('/orders/:id', async (req, res) => {
@@ -632,7 +632,7 @@ admin.post('/orders/:id/refund', async (req, res) => {
   }
 });
 
-admin.get('/stats', async (_req, res) => res.json(await db.stats()));
+admin.get('/stats', async (req, res) => res.json(await db.stats({ lang: req.query.lang })));
 
 // Revisión de la configuración de producción, para el panel. Solo dice si cada pieza está
 // bien (y en qué modo), nunca devuelve claves ni direcciones completas.
