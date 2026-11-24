@@ -151,6 +151,12 @@ const EN = {
   ],
 };
 
+// "A red bike" → "a red bike" dentro de la frase. En inglés solo se baja el artículo
+// del principio, porque muchos regalos son marcas o nombres propios ("Barbie", "Hot Wheels").
+function lowerArticleEn(s) {
+  return s.replace(/^(A|An|The|Some|My)\s/, (m) => m.toLowerCase());
+}
+
 function joinEn(items) {
   if (items.length <= 1) return items.join('');
   if (items.length === 2) return items.join(' and ');
@@ -160,7 +166,7 @@ function joinEn(items) {
 function buildSantaReplyEn(order, now) {
   const seed = order.id;
   const name = (order.child_name || '').trim() || firstName(order.ship_name);
-  const gifts = (Array.isArray(order.gifts) ? order.gifts : []).filter(Boolean);
+  const gifts = (Array.isArray(order.gifts) ? order.gifts : []).filter(Boolean).map(lowerArticleEn);
   const p1 = [pick(EN.OPENINGS, seed, 'opening')];
   if (order.child_age) p1.push(pick(EN.AGE_LINES, seed, 'age').replace('{edad}', order.child_age));
   let giftsText;
@@ -188,4 +194,4 @@ function buildSantaReplyEn(order, now) {
   };
 }
 
-module.exports = { buildSantaReply, joinEs, joinEn, lowerFirst };
+module.exports = { buildSantaReply, joinEs, joinEn, lowerFirst, lowerArticleEn };

@@ -130,3 +130,9 @@ test('inglés: la respuesta de Santa sale en inglés con los regalos', () => {
   assert.match(r.paragraphs[2], /a red bike, paints, and a book/);
   assert.match(r.ps, /^P\.S\./);
 });
+
+test('respuesta de Santa en inglés: baja el artículo del regalo pero no las marcas', () => {
+  const r = buildSantaReply({ id: 'z', lang: 'en', child_name: 'Sophia', gifts: ['A red bike', 'Barbie Dreamhouse', 'An art set'] }, new Date('2026-12-01'));
+  const p = r.paragraphs.find((x) => /bike/.test(x));
+  assert.match(p, /a red bike, Barbie Dreamhouse, and an art set/);
+});
